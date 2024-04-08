@@ -16,12 +16,12 @@ from matplotlib import pyplot as plt
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
 
-data_path = '/Users/juliengadonneix/Desktop/stage 3a/data/DREAMER/'
+data_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/data/DREAMER/'
 mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
 
 data, eeg_sr, ecg_sr, eeg_electrodes, n_subjects, n_videos, _, _, _, _  = mat['DREAMER'][0, 0]
-n_subjects = n_subjects[0, 0]
-n_videos = n_videos[0, 0]
+n_subjects = int(n_subjects[0, 0])
+n_videos = int(n_videos[0, 0])
 
 samples = np.inf
 for i in range(n_subjects):
@@ -58,11 +58,11 @@ y_val = y_val[perm_indices]
 y_aro = y_aro[perm_indices]
 y_dom = y_dom[perm_indices]
 
-# take 50/25/25 percent of the data to train/validate/test
-X_train      = X[0:4*p20,:,:]
-Y_train_val      = y_val[0:4*p20]
-Y_train_aro      = y_aro[0:4*p20]
-Y_train_dom      = y_dom[0:4*p20]
+# take 80/10/10 percent of the data to train/validate/test
+X_train      = X[:4*p20,:,:]
+Y_train_val      = y_val[:4*p20]
+Y_train_aro      = y_aro[:4*p20]
+Y_train_dom      = y_dom[:4*p20]
 X_validate   = X[4*p20:int(4.5*p20),:,:]
 Y_validate_val   = y_val[4*p20:int(4.5*p20)]
 Y_validate_aro   = y_aro[4*p20:int(4.5*p20)]
@@ -71,7 +71,6 @@ X_test       = X[int(4.5*p20):,:,:]
 Y_test_val       = y_val[int(4.5*p20):]
 Y_test_aro       = y_aro[int(4.5*p20):]
 Y_test_dom       = y_dom[int(4.5*p20):]
-
 
 ############################# EEGNet portion ##################################
 
@@ -105,7 +104,7 @@ model_dom = EEGNet(nb_classes=5, Chans=chans, Samples=samples,
 # compile the model and set the optimizers
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device) # to be adjusted
 loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
-lr = 0.00001
+lr = 0.0001
 optimizer_val = torch.optim.Adam(model_val.parameters(), lr=lr)
 optimizer_aro = torch.optim.Adam(model_aro.parameters(), lr=lr)
 optimizer_dom = torch.optim.Adam(model_dom.parameters(), lr=lr)
@@ -131,7 +130,7 @@ checkpointer_dom = './tmp/checkpoint_DREAMER_dom.pth'
 min_val_loss_val = float('inf')
 min_val_loss_aro = float('inf')
 min_val_loss_dom = float('inf')
-for epoch in range(300):
+for epoch in range(200):
     avg_loss_val = 0.
     avg_loss_aro = 0.
     avg_loss_dom = 0.
@@ -214,9 +213,9 @@ probs_dom       = model_dom(X_test).detach().cpu().numpy()
 preds_val       = probs_val.argmax(axis = -1)
 preds_aro       = probs_aro.argmax(axis = -1)
 preds_dom       = probs_dom.argmax(axis = -1)
-acc_val = np.mean(preds_val == Y_test_val.argmax(axis=-1).cpu().numpy())
-acc_aro = np.mean(preds_aro == Y_test_aro.argmax(axis=-1).cpu().numpy())
-acc_dom = np.mean(preds_dom == Y_test_dom.argmax(axis=-1).cpu().numpy())
+acc_val = np.mean(preds_val == Y_test_val.argmax(dim=-1).cpu().numpy())
+acc_aro = np.mean(preds_aro == Y_test_aro.argmax(dim=-1).cpu().numpy())
+acc_dom = np.mean(preds_dom == Y_test_dom.argmax(dim=-1).cpu().numpy())
 print("Classification accuracy on valence: %f " % (acc_val))
 print("Classification accuracy on arousal: %f " % (acc_aro))
 print("Classification accuracy on dominance: %f " % (acc_dom))
@@ -250,42 +249,49 @@ X_test       = X_test.reshape(X_test.shape[0], chans, samples)
 
 # train a classifier with xDAWN spatial filtering + Riemannian Geometry (RG)
 # labels need to be back in single-column format
-clf_val.fit(X_train.numpy(), Y_train_val.argmax(axis=-1).cpu().numpy())
-clf_aro.fit(X_train.numpy(), Y_train_aro.argmax(axis=-1).cpu().numpy())
-clf_dom.fit(X_train.numpy(), Y_train_dom.argmax(axis=-1).cpu().numpy())
-preds_rg_val = clf_val.predict(X_test.numpy())
-preds_rg_aro = clf_aro.predict(X_test.numpy())
-preds_rg_dom = clf_dom.predict(X_test.numpy())
+clf_val.fit(X_train.cpu().numpy(), Y_train_val.argmax(axis=-1).cpu().numpy())
+clf_aro.fit(X_train.cpu().numpy(), Y_train_aro.argmax(axis=-1).cpu().numpy())
+clf_dom.fit(X_train.cpu().numpy(), Y_train_dom.argmax(axis=-1).cpu().numpy())
+preds_rg_val = clf_val.predict(X_test.cpu().numpy())
+preds_rg_aro = clf_aro.predict(X_test.cpu().numpy())
+preds_rg_dom = clf_dom.predict(X_test.cpu().numpy())
 
 # Printing the results
 acc2_val = np.mean(preds_rg_val == Y_test_val.argmax(axis=-1).cpu().numpy())
 acc2_aro = np.mean(preds_rg_aro == Y_test_aro.argmax(axis=-1).cpu().numpy())
 acc2_dom = np.mean(preds_rg_dom == Y_test_dom.argmax(axis=-1).cpu().numpy())
-print("Classification accuracy: %f " % (acc2_val))
-print("Classification accuracy: %f " % (acc2_aro))
-print("Classification accuracy: %f " % (acc2_dom))
+print("Classification accuracy on valence with xDawn+RG: %f " % (acc2_val))
+print("Classification accuracy on arousal with xDawn+RG: %f " % (acc2_aro))
+print("Classification accuracy on dominance with xDawn+RG: %f " % (acc2_dom))
 
+figs_path = './figs/'
 # plot the confusion matrices for both classifiers
 names = ['1', '2', '3', '4', '5']
 ConfusionMatrixDisplay(confusion_matrix(preds_val, Y_test_val.argmax(axis = -1).cpu().numpy()), display_labels=names).plot()
-plt.title('EEGNet-8,2 valence')
+plt.title('EEGNet-16,4 valence')
 plt.show()
+plt.savefig(figs_path + 'confusion_matrix_valence_EEGNet.png')
 ConfusionMatrixDisplay(confusion_matrix(preds_aro, Y_test_aro.argmax(axis = -1).cpu().numpy()), display_labels=names).plot()
-plt.title('EEGNet-8,2 arousal')
+plt.title('EEGNet-16,4 arousal')
 plt.show()
+plt.savefig(figs_path + 'confusion_matrix_arousal_EEGNet.png')
 ConfusionMatrixDisplay(confusion_matrix(preds_dom, Y_test_dom.argmax(axis = -1).cpu().numpy()), display_labels=names).plot()
-plt.title('EEGNet-8,2 dominance')
+plt.title('EEGNet-16,4 dominance')
 plt.show()
+plt.savefig(figs_path + 'confusion_matrix_dominance_EEGNet.png')
 
 ConfusionMatrixDisplay(confusion_matrix(preds_rg_val, Y_test_val.argmax(axis = -1).cpu().numpy()), display_labels=names).plot()
 plt.title('xDAWN + RG valence')
 plt.show()
+plt.savefig(figs_path + 'confusion_matrix_valence_xDawnRG.png')
 ConfusionMatrixDisplay(confusion_matrix(preds_rg_aro, Y_test_aro.argmax(axis = -1).cpu().numpy()), display_labels=names).plot()
 plt.title('xDAWN + RG arousal')
 plt.show()
+plt.savefig(figs_path + 'confusion_matrix_arousal_xDawnRG.png')
 ConfusionMatrixDisplay(confusion_matrix(preds_rg_dom, Y_test_dom.argmax(axis = -1).cpu().numpy()), display_labels=names).plot()
 plt.title('xDAWN + RG dominance')
 plt.show()
+plt.savefig(figs_path + 'confusion_matrix_dominance_xDawnRG.png')
 
 
 
