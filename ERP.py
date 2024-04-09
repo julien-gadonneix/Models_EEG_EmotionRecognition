@@ -96,7 +96,7 @@ from matplotlib import pyplot as plt
 
 ##################### Process, filter and epoch the data ######################
 # data_path = sample.data_path()
-data_path = '/Users/juliengadonneix/Desktop/stage 3a/data/mne_data'
+data_path = '/Users/juliengadonneix/Desktop/stage 3a/data/mne_data/MNE-sample-data'
 
 # Set parameters and read data
 data_path = str(data_path)
