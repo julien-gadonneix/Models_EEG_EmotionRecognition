@@ -10,7 +10,10 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import confusion_matrix
 
 
-def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, checkpointer, device):
+def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, checkpointer,
+          device, figs_path, info_str):
+    test_losses = []
+    train_losses = []
     min_val_loss = np.inf
     for epoch in range(epochs):
         avg_loss = 0.
@@ -27,6 +30,7 @@ def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, ch
             loss.backward()
             optimizer.step()
         avg_loss /= it
+        train_losses.append(avg_loss)
 
         model.eval()
         it = 0
@@ -47,11 +51,19 @@ def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, ch
             if avg_val_loss < min_val_loss:
                 min_val_loss = avg_val_loss
                 torch.save(model.state_dict(), checkpointer)
+            test_losses.append(avg_val_loss)
+        print("Epoch %d: Train loss %.3f, Validation loss %.3f, Validation accuracy %.2f" 
+              % (epoch, avg_loss, avg_val_loss, avg_val_acc))
+    plt.plot(train_losses, label='Training loss')
+    plt.plot(test_losses, label='Validation loss')
+    plt.legend()
+    plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(figs_path + 'loss_' + info_str + '_' + model.name + '.png')
 
-        print(f'Epoch {epoch} (Valence): Train loss: {avg_loss} Validation loss: {avg_val_loss} Validation accuracy: {avg_val_acc}')
 
-
-def test(model, test_loader, selected_emotion, figs_path, names, device):
+def test(model, test_loader, names, figs_path, device, info_str):
     it = 0
     avg_acc = 0.
     preds_total = []
@@ -71,21 +83,23 @@ def test(model, test_loader, selected_emotion, figs_path, names, device):
     preds = np.concatenate(preds_total)
     Y_test = np.concatenate(Y_test)
 
-    print("Classification accuracy on " + selected_emotion + ": %f " % (avg_acc))
-    ConfusionMatrixDisplay(confusion_matrix(preds, Y_test.argmax(axis = -1)), display_labels=names).plot()
-    plt.title('EEGNet-16,4 valence')
+    print("Classification accuracy on " + info_str[:-1] + ": %f " % (avg_acc))
+    ConfusionMatrixDisplay(confusion_matrix(preds, Y_test), display_labels=names).plot()
+    plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
+    plt.xlabel("Predicted \n Classification accuracy: %.2f " % (avg_acc))
+    plt.tight_layout()
     plt.show()
-    plt.savefig(figs_path + 'confusion_matrix_valence_EEGNet.png')
+    plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_' + model.name +'.png')
 
 
-def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, selected_emotion, names, figs_path):
+def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str):
     # code is taken from PyRiemann's ERP sample script, which is decoding in 
     # the tangent space with a logistic regression
     clf = make_pipeline(XdawnCovariances(n_components),
                         TangentSpace(metric='riemann'),
                         LogisticRegression())
-    X_train = dataset.data[train_indices].reshape(len(train_indices), chans, samples).numpy()
-    X_test = dataset.data[test_indices].reshape(len(test_indices), chans, samples).numpy()
+    X_train = dataset.data[train_indices].squeeze().numpy()
+    X_test = dataset.data[test_indices].squeeze().numpy()
     Y_train = dataset.targets[train_indices].numpy()
     Y_test = dataset.targets[test_indices].numpy()
 
@@ -94,8 +108,10 @@ def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, 
     preds_rg = clf.predict(X_test)
     acc = np.mean(preds_rg == Y_test.argmax(axis=-1))
 
-    print("Classification accuracy on " + selected_emotion + " with xDawn+RG: %f " % (acc))
+    print("Classification accuracy on " + info_str[:-1] + " with xDawn+RG: %f " % (acc))
     ConfusionMatrixDisplay(confusion_matrix(preds_rg, Y_test.argmax(axis = -1)), display_labels=names).plot()
     plt.title('xDAWN + RG valence')
+    plt.xlabel("Predicted \n Classification accuracy: %.2f " % (acc))
+    plt.tight_layout()
     plt.show()
-    plt.savefig(figs_path + 'confusion_matrix_valence_xDawnRG.png')
+    plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_xDawnRG.png')

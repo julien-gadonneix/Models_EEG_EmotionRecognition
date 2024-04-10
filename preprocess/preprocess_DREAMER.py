@@ -2,31 +2,46 @@ import scipy.io
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+import mne
+import os
 
 
 class DREAMERDataset(Dataset):
-    def __init__(self, emotion, subject=None, samples=128, start=0):
+    def __init__(self, path, emotion, subject=None, samples=128, start=0, lowcut=0.3, highcut=80, order=5):
+        data_path = path + 'data.pt'
+        if os.path.exists(data_path):
+            print("Loading dataset from file.")
+            self.data = torch.load(data_path)
+            self.targets = torch.load(path + 'targets.pt')
+        else:
+            print("Building dataset.")
+            self._build(path, emotion, subject, samples, start, lowcut, highcut, order)
+
+
+    def _build(self, path, emotion, subject=None, samples=128, start=0, lowcut=0.3, highcut=80, order=5):
         data_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
-        data, eeg_sr, _, eeg_electrodes, n_subjects, n_videos, _, _, _, _  = mat['DREAMER'][0, 0]
-        self.samples = samples
-        self.start = start
-        self.eeg_sr = int(eeg_sr[0, 0])
-        eeg_electrodes = eeg_electrodes[0]
-        self.eeg_electrodes = [eeg_electrodes[i][0] for i in range(eeg_electrodes.size)]
-        self.n_subjects = int(n_subjects[0, 0])
-        self.n_videos = int(n_videos[0, 0])
+        data, eeg_sr, _, _, n_subjects, n_videos, _, _, _, _  = mat['DREAMER'][0, 0]
+        eeg_sr = int(eeg_sr[0, 0])
+        n_subjects = int(n_subjects[0, 0])
+        n_videos = int(n_videos[0, 0])
 
         X = []
         y = []
         if subject is None:
             print("Dataset for subject-independent classification")
-            for i in range(self.n_subjects):
+            for i in range(n_subjects):
                 _, _, eeg, _, val, aro, dom = data[0, i][0][0]
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
-                for j in range(self.n_videos):
+                for j in range(n_videos):
                     stimuli_eeg_j = stimuli_eeg[j, 0]
+                    stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                          method='iir', 
+                                          iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
                     baseline_eeg_j = baseline_eeg[j, 0]
+                    baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                          method='iir', 
+                                          iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
                     stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                     stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                     for k in range((stimuli_eeg_j.shape[0]//samples)-start):
@@ -45,9 +60,15 @@ class DREAMERDataset(Dataset):
             print("Dataset for subject-dependent classification")
             _, _, eeg, _, val, aro, dom = data[0, subject][0][0]
             baseline_eeg, stimuli_eeg = eeg[0, 0]
-            for j in range(self.n_videos):
+            for j in range(n_videos):
                 stimuli_eeg_j = stimuli_eeg[j, 0]
+                stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j, self.eeg_sr, lowcut, highcut, 
+                                        method='iir', 
+                                        iir_params=dict(order=order, ftype='butterworth'), verbose=False)
                 baseline_eeg_j = baseline_eeg[j, 0]
+                baseline_eeg_j = mne.filter.filter_data(stimuli_eeg_j, self.eeg_sr, lowcut, highcut, 
+                                        method='iir', 
+                                        iir_params=dict(order=order, ftype='butterworth'), verbose=False)
                 stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                 stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                 for k in range((stimuli_eeg_j.shape[0]//samples)-start):
@@ -66,9 +87,14 @@ class DREAMERDataset(Dataset):
         torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
         self.targets = torch.nn.functional.one_hot(torch.tensor(y)).float()
+        self._save(path)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         return self.data[idx], self.targets[idx]
+    
+    def _save(self, path):
+        torch.save(self.data, path + 'data.pt')
+        torch.save(self.targets, path + 'targets.pt')
