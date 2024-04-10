@@ -91,7 +91,7 @@ class EEGNet(nn.Module):
 class EEGNet_SSVEP(nn.Module):
     def __init__(self, nb_classes, Chans=64, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
                  D=2, F2=16, norm_rate=0.25, dropoutType='Dropout'):
-        super(EEGNet, self).__init__()
+        super(EEGNet_SSVEP, self).__init__()
         """ PyTorch Implementation of SSVEP Variant of EEGNet """
 
         self.name = f'EEGNet_SSVEP-{F1},{D}'
