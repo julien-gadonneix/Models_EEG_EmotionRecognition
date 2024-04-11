@@ -54,12 +54,12 @@ def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, ch
             test_losses.append(avg_val_loss)
         print("Epoch %d: Train loss %.3f, Validation loss %.3f, Validation accuracy %.2f" 
               % (epoch, avg_loss, avg_val_loss, avg_val_acc))
+    plt.figure()
     plt.plot(train_losses, label='Training loss')
     plt.plot(test_losses, label='Validation loss')
     plt.legend()
     plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
     plt.tight_layout()
-    plt.show()
     plt.savefig(figs_path + 'loss_' + info_str + '_' + model.name + '.png')
 
 
@@ -88,7 +88,6 @@ def test(model, test_loader, names, figs_path, device, info_str):
     plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
     plt.xlabel("Predicted \n Classification accuracy: %.2f " % (avg_acc))
     plt.tight_layout()
-    plt.show()
     plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_' + model.name +'.png')
 
 
@@ -113,5 +112,4 @@ def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, 
     plt.title('xDAWN + RG valence')
     plt.xlabel("Predicted \n Classification accuracy: %.2f " % (acc))
     plt.tight_layout()
-    plt.show()
     plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_xDawnRG.png')
