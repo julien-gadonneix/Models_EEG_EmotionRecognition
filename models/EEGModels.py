@@ -53,7 +53,7 @@ class EEGNet(nn.Module):
         super(EEGNet, self).__init__()
         """ PyTorch Implementation of EEGNet """
 
-        self.name = f'EEGNet-{F1},{D}'
+        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
         self.norm_rate = norm_rate
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
@@ -94,7 +94,7 @@ class EEGNet_SSVEP(nn.Module):
         super(EEGNet_SSVEP, self).__init__()
         """ PyTorch Implementation of SSVEP Variant of EEGNet """
 
-        self.name = f'EEGNet_SSVEP-{F1},{D}'
+        self.name = f'EEGNet_SSVEP-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
         self.norm_rate = norm_rate
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d

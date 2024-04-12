@@ -29,7 +29,7 @@ class DREAMERDataset(Dataset):
         X = []
         y = []
         if subject is None:
-            print("Dataset for subject-independent classification")
+            print("Dataset with all subjects")
             for i in range(n_subjects):
                 _, _, eeg, _, val, aro, dom = data[0, i][0][0]
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
@@ -57,7 +57,7 @@ class DREAMERDataset(Dataset):
                         else:
                             raise ValueError('Invalid emotion')
         else:
-            print("Dataset for subject-dependent classification")
+            print("Dataset with 1 subject")
             _, _, eeg, _, val, aro, dom = data[0, subject][0][0]
             baseline_eeg, stimuli_eeg = eeg[0, 0]
             for j in range(n_videos):

@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
 
-lowcut = 0.3
+lowcut = .3
 highcut = 60.
 order = 5
 start = 0
@@ -27,25 +27,29 @@ best_sample = 256
 # samples = [128, 256, 512, 1024, 2048]
 subject = None
 
-epochs = 350
+epochs = 1500
 batch_size = 128
 random_seed= 42
 validation_split = .25
 test_split = .25
 lr = 0.001
 
-F1s = [4, 8, 16, 32, 64]
-Ds = [1, 2, 4, 8, 16]
-F2s = [4, 16, 64, 256, 1024]
-kernLength = 64
-dropout = 0.3
+best_F1 = 32
+best_D = 8
+best_F2 = 64
+# F1s = [4, 8, 16, 32, 64]
+# Ds = [1, 2, 4, 8, 16]
+# F2s = [4, 16, 64, 256, 1024]
+best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
+# kernLengths = [16, 32, 64, 128]
+dropouts = [.1, .3, .5, .7]
 
 selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device) # to be adjusted
 names = ['1', '2', '3', '4', '5']
 print('Selected emotion:', selected_emotion)
 
-n_components = 2  # pick some components for xDwanRG
+n_components = 2  # pick some components for xDawnRG
 
 figs_path = './figs/'
 sets_path = './sets/'
@@ -56,7 +60,7 @@ np.random.seed(random_seed)
 # Search for optimal hyperparameters
 ###############################################################################
 
-for F1, D, F2 in zip(F1s, Ds, F2s):
+for dropout in dropouts:
       info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({lowcut}, {highcut}, {order})_samples({best_sample})_start({start})_'
 
 
@@ -92,7 +96,7 @@ for F1, D, F2 in zip(F1s, Ds, F2s):
       chans = dataset.data[0].shape[1]
       nb_classes = dataset.targets[0].shape[0]
       best_model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
-                  dropoutRate=dropout, kernLength=kernLength, F1=F1, D=D, F2=F2, dropoutType='Dropout').to(device)
+                  dropoutRate=dropout, kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device)
       # model2 = EEGNet_SSVEP(nb_classes=nb_classes, Chans=chans, Samples=samples, 
       #                dropoutRate=dropout, kernLength=kernLength, F1=F1, D=D, F2=F2, dropoutType='Dropout').to(device)
 
