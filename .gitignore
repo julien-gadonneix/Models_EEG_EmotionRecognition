@@ -9,5 +9,4 @@ __pycache__
 
 # Ignore results
 tmp/
-figs/
 sets/
