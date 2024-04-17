@@ -11,7 +11,7 @@ from sklearn.metrics import confusion_matrix
 
 
 def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, checkpointer,
-          device, figs_path, info_str):
+          device, figs_path, info_str, save_figs):
     test_losses = []
     train_losses = []
     min_val_loss = np.inf
@@ -52,18 +52,20 @@ def train(model, epochs, train_loader, validation_loader, optimizer, loss_fn, ch
                 min_val_loss = avg_val_loss
                 torch.save(model.state_dict(), checkpointer)
             test_losses.append(avg_val_loss)
-        print("Epoch %d: Train loss %.3f, Validation loss %.3f, Validation accuracy %.2f" 
-              % (epoch, avg_loss, avg_val_loss, avg_val_acc))
-    plt.figure()
-    plt.plot(train_losses, label='Training loss')
-    plt.plot(test_losses, label='Validation loss')
-    plt.legend()
-    plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
-    plt.tight_layout()
-    plt.savefig(figs_path + 'loss_' + info_str + '_' + model.name + '.png')
+        if epoch % 25 == 0:
+            print("Epoch %d: Train loss %.3f, Validation loss %.3f, Validation accuracy %.2f" 
+                % (epoch, avg_loss, avg_val_loss, avg_val_acc))
+    if save_figs:
+        plt.figure()
+        plt.plot(train_losses, label='Training loss')
+        plt.plot(test_losses, label='Validation loss')
+        plt.legend()
+        plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
+        plt.tight_layout()
+        plt.savefig(figs_path + 'loss_' + info_str + '_' + model.name + '.png')
 
 
-def test(model, test_loader, names, figs_path, device, info_str):
+def test(model, test_loader, names, figs_path, device, info_str, save_figs):
     it = 0
     avg_acc = 0.
     preds_total = []
@@ -84,11 +86,23 @@ def test(model, test_loader, names, figs_path, device, info_str):
     Y_test = np.concatenate(Y_test)
 
     print("Classification accuracy on " + info_str[:-1] + ": %f " % (avg_acc))
+    if save_figs:
+        ConfusionMatrixDisplay(confusion_matrix(preds, Y_test), display_labels=names).plot()
+        plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
+        plt.xlabel("Predicted \n Classification accuracy: %.2f " % (avg_acc))
+        plt.tight_layout()
+        plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_' + model.name +'.png')
+    return preds, Y_test
+
+
+def subject_dependent_classification_accuracy(preds, Y_test, names, figs_path, selected_emotion):
+    acc = np.mean(preds == Y_test)
+    print("Subject-dependent classification accuracy on " + selected_emotion + ": %f " % (acc))
     ConfusionMatrixDisplay(confusion_matrix(preds, Y_test), display_labels=names).plot()
-    plt.title(info_str[:-1] + '\n' + model.name, fontsize=10)
-    plt.xlabel("Predicted \n Classification accuracy: %.2f " % (avg_acc))
+    plt.title("Subject-dependent classification accuracy on " + selected_emotion, fontsize=10)
+    plt.xlabel("Predicted \n Classification accuracy: %.2f " % (acc))
     plt.tight_layout()
-    plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_' + model.name +'.png')
+    plt.savefig(figs_path + 'confusion_matrix_subject_dependent_classification_' + selected_emotion +'.png')
 
 
 def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str):

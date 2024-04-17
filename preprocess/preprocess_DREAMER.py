@@ -13,6 +13,7 @@ class DREAMERDataset(Dataset):
             print("Loading dataset from file.")
             self.data = torch.load(data_path)
             self.targets = torch.load(path + 'targets.pt')
+            # self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
             self._build(path, emotion, subject, samples, start, lowcut, highcut, order)
@@ -62,13 +63,13 @@ class DREAMERDataset(Dataset):
             baseline_eeg, stimuli_eeg = eeg[0, 0]
             for j in range(n_videos):
                 stimuli_eeg_j = stimuli_eeg[j, 0]
-                stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j, self.eeg_sr, lowcut, highcut, 
-                                        method='iir', 
-                                        iir_params=dict(order=order, ftype='butterworth'), verbose=False)
+                stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                      method='iir', 
+                                      iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
                 baseline_eeg_j = baseline_eeg[j, 0]
-                baseline_eeg_j = mne.filter.filter_data(stimuli_eeg_j, self.eeg_sr, lowcut, highcut, 
-                                        method='iir', 
-                                        iir_params=dict(order=order, ftype='butterworth'), verbose=False)
+                baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                      method='iir', 
+                                      iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
                 stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                 stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                 for k in range((stimuli_eeg_j.shape[0]//samples)-start):
@@ -87,6 +88,7 @@ class DREAMERDataset(Dataset):
         torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
         self.targets = torch.nn.functional.one_hot(torch.tensor(y)).float()
+        # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0))
         self._save(path)
 
     def __len__(self):
@@ -98,3 +100,4 @@ class DREAMERDataset(Dataset):
     def _save(self, path):
         torch.save(self.data, path + 'data.pt')
         torch.save(self.targets, path + 'targets.pt')
+        # torch.save(self.class_weights, path + 'class_weights.pt')
