@@ -10,3 +10,4 @@ __pycache__
 # Ignore results
 tmp/
 sets/
+figs/
