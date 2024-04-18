@@ -140,9 +140,9 @@ def train_DREAMER(config):
                   # Send the current training result back to Tune
                   train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
-ray.init(num_cpus=6)
+ray.init(num_cpus=16, num_gpus=1)
 tuner = tune.Tuner(
-    tune.with_resources(train_DREAMER, resources={"cpu": 3, "gpu": 1}),
+    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 8, "GPU": 1, "accelerator_type:RTX": 1}])),
 #     run_config=train.RunConfig(
 #           stop={
 #                 "mean_accuracy": 0.95,
