@@ -7,6 +7,7 @@ import torch
 import tempfile
 import os
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP
 from preprocess.preprocess_DREAMER import DREAMERDataset
@@ -61,9 +62,10 @@ n_components = 2  # pick some components for xDawnRG
 nb_classes = 5
 chans = 14
 
-figs_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/Models_EEG_EmotionRecognition/figs/'
-sets_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/Models_EEG_EmotionRecognition/sets/'
-models_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/Models_EEG_EmotionRecognition/tmp/'
+cur_dir = Path(__file__).resolve().parent
+figs_path = str(cur_dir) + '/figs/'
+sets_path = str(cur_dir) + '/sets/'
+models_path = str(cur_dir) + '/tmp/'
 
 np.random.seed(random_seed)
 num_s = 100
@@ -142,7 +144,7 @@ def train_DREAMER(config):
 
 ray.init(num_cpus=16, num_gpus=1)
 tuner = tune.Tuner(
-    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 8, "GPU": 1, "accelerator_type:RTX": 1}])),
+    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 4, "GPU": .25, "accelerator_type:RTX": .25}])),
 #     run_config=train.RunConfig(
 #           stop={
 #                 "mean_accuracy": 0.95,

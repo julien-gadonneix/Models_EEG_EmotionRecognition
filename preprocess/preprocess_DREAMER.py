@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import mne
 import os
+from pathlib import Path
 
 
 class DREAMERDataset(Dataset):
@@ -20,7 +21,8 @@ class DREAMERDataset(Dataset):
 
 
     def _build(self, path, emotion, subject=None, samples=128, start=0, lowcut=0.3, highcut=80, order=5):
-        data_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/data/DREAMER/'
+        wdir = Path(__file__).resolve().parent.parent.parent
+        data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
         data, eeg_sr, _, _, n_subjects, n_videos, _, _, _, _  = mat['DREAMER'][0, 0]
         eeg_sr = int(eeg_sr[0, 0])
