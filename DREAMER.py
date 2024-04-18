@@ -4,16 +4,20 @@
 
 import numpy as np
 import torch
+import tempfile
+import os
 import matplotlib.pyplot as plt
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train, test, xDawnRG, subject_dependent_classification_accuracy
+from tools import train_f, test_f, xDawnRG, subject_dependent_classification_accuracy
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
-from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.metrics import confusion_matrix
+from ray.train import Checkpoint
+from ray import tune, train
+import ray
+from ray.tune.schedulers import ASHAScheduler
 
 
 ###############################################################################
@@ -23,9 +27,12 @@ from sklearn.metrics import confusion_matrix
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
 
-lowcuts = [.5, .3]
-highcuts = [None, 60]
-orders = [3, 5]
+best_highcut = None
+best_lowcut = .5
+best_order = 3
+# lowcuts = [.5, .3]
+# highcuts = [None, 60]
+# orders = [3, 5]
 best_start = 1
 # starts = [0, 1, 2, 3, 4]
 best_sample = 256
@@ -34,22 +41,16 @@ best_sample = 256
 subject = None
 
 epochs = 800
-batch_size = 128
 random_seed= 42
-validation_split = .25
-test_split = .25
-lr = 0.001
+test_split = .33
 
+best_lr = 0.001
+best_batch_size = 128
 best_F1 = 32
 best_D = 8
 best_F2 = 64
-# F1s = [4, 8, 16, 32, 64]
-# Ds = [1, 2, 4, 8, 16]
-# F2s = [4, 16, 64, 256, 1024]
 best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
-# kernLengths = [16, 32, 64, 128]
 best_dropout = .3
-# dropouts = [.1, .3, .5]
 
 selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
@@ -57,43 +58,52 @@ names = ['1', '2', '3', '4', '5']
 print('Selected emotion:', selected_emotion)
 
 n_components = 2  # pick some components for xDawnRG
+nb_classes = 5
+chans = 14
 
-figs_path = './figs/'
-sets_path = './sets/'
-save_figs = True
+figs_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/Models_EEG_EmotionRecognition/figs/'
+sets_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/Models_EEG_EmotionRecognition/sets/'
+models_path = '/users/eleves-a/2021/julien.gadonneix/stage3A/Models_EEG_EmotionRecognition/tmp/'
+
 np.random.seed(random_seed)
+num_s = 100
+info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
 
 
 ###############################################################################
 # Search for optimal hyperparameters
 ###############################################################################
 
-# preds_total = []
-# Y_test_total = []
-for order, highcut, lowcut in zip(orders, highcuts, lowcuts):
-      info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({lowcut}, {highcut}, {order})_samples({best_sample})_start({best_start})_'
+search_space = {
+    "lr": tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
+    "batch_size": tune.choice([32, 64, 128, 256, 512]),
+    "F1": tune.choice([4, 8, 16, 32, 64]),
+    "D": tune.choice([1, 2, 4, 8, 16]),
+    "F2": tune.choice([4, 16, 64, 256, 1024]),
+    "kernLength": tune.choice([16, 32, 64, 128]),
+    "dropout": tune.choice([.1, .3, .5])
+}
 
+def train_DREAMER(config):
 
       ###############################################################################
       # Data loading
       ###############################################################################
 
-      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subject=subject, samples=best_sample, start=best_start, lowcut=lowcut, highcut=highcut, order=order)
+      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subject=subject, samples=best_sample, start=best_start,
+                              lowcut=best_lowcut, highcut=best_highcut, order=best_order)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
       np.random.shuffle(indices)
-      split_val = int(np.floor(validation_split * dataset_size))
-      split_test = int(np.floor((test_split+validation_split) * dataset_size))
-      train_indices, test_indices, val_indices = indices[split_test:], indices[split_val:split_test], indices[:split_val]
+      split_test = int(np.floor(test_split * dataset_size))
+      train_indices, test_indices = indices[split_test:], indices[:split_test]
 
       # Creating data samplers and loaders:
       train_sampler = SubsetRandomSampler(train_indices)
-      valid_sampler = SubsetRandomSampler(val_indices)
       test_sampler = SubsetRandomSampler(test_indices)
-      train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
-      validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
-      test_loader = DataLoader(dataset, batch_size=batch_size, sampler=test_sampler)
+      train_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=train_sampler)
+      test_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=test_sampler)
 
       print(len(train_indices), 'train samples')
       print(len(test_indices), 'test samples')
@@ -103,38 +113,68 @@ for order, highcut, lowcut in zip(orders, highcuts, lowcuts):
       # Model configurations
       ###############################################################################
 
-      chans = dataset.data[0].shape[1]
-      nb_classes = dataset.targets[0].shape[0]
-      best_model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
-                  dropoutRate=best_dropout, kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device)
+      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
+                  dropoutRate=config['dropout'], kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device)
 
-      # set a valid path for your system to record model checkpoints
-      checkpointer = './tmp/checkpoint_' + info_str + best_model.name + '.pth'
-
-      # compile the model and set the optimizers
       loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
-      optimizer = torch.optim.Adam(best_model.parameters(), lr=lr)
+      optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
 
 
       ###############################################################################
       # Train and test
       ###############################################################################
 
-      train(best_model, epochs, train_loader, validation_loader, optimizer, loss_fn, checkpointer,
-            device, figs_path, info_str, save_figs)
+      for epoch in range(epochs):
+            train_f(model, train_loader, optimizer, loss_fn, device)
+            acc = test_f(model, test_loader, device)
 
-      # load optimal weights
-      best_model.load_state_dict(torch.load(checkpointer))
+            with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
+                  checkpoint = None
+                  if (epoch + 1) % 5 == 0:
+                        torch.save(
+                              model.state_dict(),
+                              os.path.join(temp_checkpoint_dir, "model.pth")
+                        )
+                        checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
 
-      preds, Y_test = test(best_model, test_loader, names, figs_path, device, info_str, save_figs)
-# test(model2, test_loader, names, figs_path, device, info_str)
+                  # Send the current training result back to Tune
+                  train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
-# preds_total.append(preds)
-# Y_test_total.append(Y_test)
+ray.init(num_cpus=6)
+tuner = tune.Tuner(
+    tune.with_resources(train_DREAMER, resources={"cpu": 3, "gpu": 1}),
+#     run_config=train.RunConfig(
+#           stop={
+#                 "mean_accuracy": 0.95,
+#                 "training_iteration": num_s
+#                 },
+#                 checkpoint_config=train.CheckpointConfig(
+#                       checkpoint_at_end=True, checkpoint_frequency=3
+#                       )
+#     ),
+    tune_config=tune.TuneConfig(
+          metric="mean_accuracy",
+          mode="max",
+          num_samples=num_s,
+          scheduler=ASHAScheduler()
+    ),
+    param_space=search_space
+)
+results = tuner.fit()
+print("Best config is:", results.get_best_result().config)
 
-# preds_total = np.concatenate(preds_total)
-# Y_test_total = np.concatenate(Y_test_total)
-# subject_dependent_classification_accuracy(preds_total, Y_test_total, names, figs_path, selected_emotion)
+dfs = {result.path: result.metrics_dataframe for result in results}
+ax = None
+for d in dfs.values():
+      ax = d.mean_accuracy.plot(ax=ax, legend=False)
+plt.xlabel("Epochs")
+plt.ylabel("Mean Accuracy")
+plt.savefig(figs_path + 'tune_model_results.png')
+
+best_result = results.get_best_result("mean_accuracy", mode="max")
+with best_result.checkpoint.as_directory() as checkpoint_dir:
+    state_dict = torch.load(os.path.join(checkpoint_dir, "model.pth"))
+    torch.save(state_dict, models_path + "model.pth")
 
 ###############################################################################
 # Statistical benchmark analysis
