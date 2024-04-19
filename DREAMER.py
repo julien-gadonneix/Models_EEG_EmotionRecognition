@@ -132,7 +132,7 @@ def train_DREAMER(config):
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
-                  if (epoch + 1) % 5 == 0:
+                  if (epoch + 1) % 50 == 0:
                         torch.save(
                               model.state_dict(),
                               os.path.join(temp_checkpoint_dir, "model.pth")
