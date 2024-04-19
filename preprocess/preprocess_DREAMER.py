@@ -89,7 +89,7 @@ class DREAMERDataset(Dataset):
         X = torch.stack(X)
         torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
-        self.targets = torch.nn.functional.one_hot(torch.tensor(y)).float()
+        self.targets = torch.nn.functional.one_hot(torch.LongTensor(y)).float()
         # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0))
         self._save(path)
 

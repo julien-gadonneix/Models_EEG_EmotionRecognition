@@ -49,7 +49,7 @@ best_lr = 0.001
 best_batch_size = 128
 best_F1 = 32
 best_D = 8
-best_F2 = 64
+best_F2 = 256
 best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
 best_dropout = .3
 
@@ -68,7 +68,7 @@ sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
 
 np.random.seed(random_seed)
-num_s = 100
+num_s = 1
 info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
 
 
@@ -77,13 +77,13 @@ info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_
 ###############################################################################
 
 search_space = {
-    "lr": tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
-    "batch_size": tune.choice([32, 64, 128, 256, 512]),
-    "F1": tune.choice([4, 8, 16, 32, 64]),
-    "D": tune.choice([1, 2, 4, 8, 16]),
-    "F2": tune.choice([4, 16, 64, 256, 1024]),
-    "kernLength": tune.choice([16, 32, 64, 128]),
-    "dropout": tune.choice([.1, .3, .5])
+    "lr": best_lr, # tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
+    "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
+    "F1": tune.grid_search([4, 8, 16, 32, 64]),
+    "D": tune.grid_search([1, 2, 4, 8, 16]),
+    "F2": tune.grid_search([4, 16, 64, 256, 1024]),
+    "kernLength": tune.grid_search([16, 32, 64, 128]),
+    "dropout": tune.grid_search([.1, .3, .5])
 }
 
 def train_DREAMER(config):
@@ -158,7 +158,7 @@ tuner = tune.Tuner(
           metric="mean_accuracy",
           mode="max",
           num_samples=num_s,
-          scheduler=ASHAScheduler()
+          scheduler=ASHAScheduler(max_t=epochs, grace_period=10)
     ),
     param_space=search_space
 )
@@ -169,6 +169,7 @@ dfs = {result.path: result.metrics_dataframe for result in results}
 ax = None
 for d in dfs.values():
       ax = d.mean_accuracy.plot(ax=ax, legend=False)
+plt.title("Best config is: \n" + results.get_best_result().config, fontsize=10)
 plt.xlabel("Epochs")
 plt.ylabel("Mean Accuracy")
 plt.savefig(figs_path + 'tune_model_results.png')
@@ -176,7 +177,7 @@ plt.savefig(figs_path + 'tune_model_results.png')
 best_result = results.get_best_result("mean_accuracy", mode="max")
 with best_result.checkpoint.as_directory() as checkpoint_dir:
     state_dict = torch.load(os.path.join(checkpoint_dir, "model.pth"))
-    torch.save(state_dict, models_path + "model.pth")
+    torch.save(state_dict, models_path + "best_model.pth")
 
 ###############################################################################
 # Statistical benchmark analysis
