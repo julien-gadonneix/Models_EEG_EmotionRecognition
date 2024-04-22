@@ -69,7 +69,6 @@ models_path = str(cur_dir) + '/tmp/'
 
 np.random.seed(random_seed)
 num_s = 1
-info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
 
 
 ###############################################################################
@@ -87,6 +86,8 @@ search_space = {
 }
 
 def train_DREAMER(config):
+
+      info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
 
       ###############################################################################
       # Data loading
@@ -132,28 +133,21 @@ def train_DREAMER(config):
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
-                  if (epoch + 1) % 50 == 0:
+                  if epoch + 1 == epochs:
                         torch.save(
                               model.state_dict(),
                               os.path.join(temp_checkpoint_dir, "model.pth")
                         )
                         checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
 
-                  # Send the current training result back to Tune
                   train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
 ray.init(num_cpus=16, num_gpus=1)
 tuner = tune.Tuner(
     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 4, "GPU": .25, "accelerator_type:RTX": .25}])),
-#     run_config=train.RunConfig(
-#           stop={
-#                 "mean_accuracy": 0.95,
-#                 "training_iteration": num_s
-#                 },
-#                 checkpoint_config=train.CheckpointConfig(
-#                       checkpoint_at_end=True, checkpoint_frequency=3
-#                       )
-#     ),
+    run_config=train.RunConfig(
+          checkpoint_config=train.CheckpointConfig(num_to_keep=5)
+    ),
     tune_config=tune.TuneConfig(
           metric="mean_accuracy",
           mode="max",
