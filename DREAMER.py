@@ -41,7 +41,7 @@ best_sample = 256
 # subjects = [i for i in range(23)]
 subject = None
 
-epochs = 800
+epochs = 500
 random_seed= 42
 test_split = .33
 
@@ -50,7 +50,7 @@ best_batch_size = 128
 best_F1 = 32
 best_D = 8
 best_F2 = 256
-best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
+best_kernLength = 33 # 32 # maybe go back to 64 because now f_min = 4Hz
 best_dropout = .3
 
 selected_emotion = 'valence'
@@ -143,7 +143,9 @@ def train_DREAMER(config):
                   train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
 ray.init(num_cpus=16, num_gpus=1)
+# ray.init(num_cpus=8, num_gpus=1)
 tuner = tune.Tuner(
+#     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 2, "GPU": .25, "accelerator_type:P620": .25}])),
     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 4, "GPU": .25, "accelerator_type:RTX": .25}])),
     run_config=train.RunConfig(
           checkpoint_config=train.CheckpointConfig(num_to_keep=5)
