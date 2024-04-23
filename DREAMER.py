@@ -148,13 +148,16 @@ tuner = tune.Tuner(
 #     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 2, "GPU": .25, "accelerator_type:P620": .25}])),
     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 4, "GPU": .25, "accelerator_type:RTX": .25}])),
     run_config=train.RunConfig(
-          checkpoint_config=train.CheckpointConfig(num_to_keep=5)
+          checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
+          verbose=0
     ),
     tune_config=tune.TuneConfig(
           metric="mean_accuracy",
           mode="max",
           num_samples=num_s,
-          scheduler=ASHAScheduler(max_t=epochs, grace_period=10)
+          scheduler=ASHAScheduler(max_t=epochs, grace_period=10),
+          trial_name_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}",
+          trial_dirname_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}"
     ),
     param_space=search_space
 )
