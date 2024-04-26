@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class DREAMERDataset(Dataset):
-    def __init__(self, path, emotion, subjects=None, samples=128, start=0, lowcut=0.3, highcut=80, order=5):
+    def __init__(self, path, emotion, subjects=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -17,10 +17,10 @@ class DREAMERDataset(Dataset):
             # self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
-            self._build(path, emotion, subjects, samples, start, lowcut, highcut, order)
+            self._build(path, emotion, subjects, samples, start, lowcut, highcut, order, save)
 
 
-    def _build(self, path, emotion, subjects=None, samples=128, start=0, lowcut=0.3, highcut=80, order=5):
+    def _build(self, path, emotion, subjects=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
@@ -92,7 +92,8 @@ class DREAMERDataset(Dataset):
         self.data = X.unsqueeze(1)
         self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=5).float()
         # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0))
-        self._save(path)
+        if save:
+            self._save(path)
 
     def __len__(self):
         return len(self.data)

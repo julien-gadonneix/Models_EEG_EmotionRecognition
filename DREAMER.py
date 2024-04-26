@@ -29,7 +29,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.ba
 print('Using device:', device)
 
 best_highcut = None
-best_lowcut = .5
+best_lowcut = .3
 best_order = 3
 best_start = 1
 best_sample = 128
@@ -45,7 +45,7 @@ best_batch_size = 128
 best_F1 = 32
 best_D = 8
 best_F2 = 256
-best_kernLength = 33 # 32 # maybe go back to 64 because now f_min = 4Hz
+best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
 best_dropout = .3
 
 selected_emotion = 'valence'
@@ -129,7 +129,7 @@ def train_DREAMER(config):
 
       for epoch in range(epochs):
             _ = train_f(model, train_loader, optimizer, loss_fn, device)
-            acc = test_f(model, test_loader, device)
+            acc, _ = test_f(model, test_loader, device)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
