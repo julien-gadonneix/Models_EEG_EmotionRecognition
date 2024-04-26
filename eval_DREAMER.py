@@ -40,7 +40,7 @@ best_F2 = 256
 best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
 best_dropout = .3
 
-selected_emotion = 'arousal'
+selected_emotion = 'dominance'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
 names = ['1', '2', '3', '4', '5']
 print('Selected emotion:', selected_emotion)
@@ -53,6 +53,7 @@ cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
 sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
+save = False
 
 np.random.seed(random_seed)
 num_s = 1
@@ -77,7 +78,7 @@ if dependent:
         ###############################################################################
 
         dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))

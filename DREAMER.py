@@ -11,7 +11,7 @@ from pathlib import Path
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train_f, test_f, xDawnRG, subject_dependent_classification_accuracy
+from tools import train_f, test_f, xDawnRG
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -34,7 +34,7 @@ best_order = 3
 best_start = 1
 best_sample = 128
 # subjects = [i for i in range(23)]
-subject = None
+subjects = None
 
 epochs = 500
 random_seed= 42
@@ -61,6 +61,7 @@ cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
 sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
+save = False
 
 np.random.seed(random_seed)
 num_s = 1
@@ -87,14 +88,14 @@ search_space = {
 
 def train_DREAMER(config):
 
-      info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
+      info_str = 'DREAMER_' + selected_emotion + f'_subject({subjects})_filtered({config["lowcut"]}, {config["highcut"]}, {config["order"]})_samples({config["sample"]})_start({config["start"]})_'
 
       ###############################################################################
       # Data loading
       ###############################################################################
 
-      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subject=subject, samples=best_sample, start=best_start,
-                              lowcut=best_lowcut, highcut=best_highcut, order=best_order)
+      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, samples=config["sample"], start=config["start"],
+                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], save=save)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -116,7 +117,7 @@ def train_DREAMER(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
+      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], 
                   dropoutRate=config['dropout'], kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device)
 
       loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
@@ -168,7 +169,7 @@ dfs = {result.path: result.metrics_dataframe for result in results}
 ax = None
 for d in dfs.values():
       ax = d.mean_accuracy.plot(ax=ax, legend=False)
-plt.title("Best config is: \n" + results.get_best_result().config, fontsize=10)
+plt.title("Best config is: \n" + str(results.get_best_result().config), fontsize=10)
 plt.xlabel("Epochs")
 plt.ylabel("Mean Accuracy")
 plt.savefig(figs_path + 'tune_model_results.png')
