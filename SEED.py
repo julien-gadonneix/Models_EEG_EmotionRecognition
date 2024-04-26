@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP
-from preprocess.preprocess_DREAMER import DREAMERDataset
+from preprocess.preprocess_SEED import SEEDDataset
 from tools import train_f, test_f, xDawnRG, subject_dependent_classification_accuracy
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -28,12 +28,8 @@ from ray.tune.schedulers import ASHAScheduler
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
 
-best_highcut = None
-best_lowcut = .5
-best_order = 3
 best_start = 1
-best_sample = 128
-# subjects = [i for i in range(23)]
+best_sample = 400
 subject = None
 
 epochs = 800
@@ -48,14 +44,11 @@ best_F2 = 256
 best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
 best_dropout = .3
 
-selected_emotion = 'valence'
-class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
-names = ['1', '2', '3', '4', '5']
-print('Selected emotion:', selected_emotion)
+names = ['Negative', 'Neutral', 'Positive']
 
 n_components = 2  # pick some components for xDawnRG
-nb_classes = 5
-chans = 14
+nb_classes = len(names)
+chans = 62
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
@@ -73,11 +66,6 @@ num_s = 1
 search_space = {
     "lr": best_lr, # tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
-    "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
-    "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
-    "order": best_order, # tune.grid_search([3, 5]),
-    "lowcut": best_lowcut, # tune.grid_search([.5, .3]),
-    "highcut": best_highcut, # tune.grid_search([None, 60, 63]),
     "F1": tune.grid_search([4, 8, 16, 32, 64]),
     "D": tune.grid_search([1, 2, 4, 8, 16]),
     "F2": tune.grid_search([4, 16, 64, 256, 1024]),
@@ -87,14 +75,13 @@ search_space = {
 
 def train_DREAMER(config):
 
-      info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
+      info_str = 'SEED_' + f'_subject({subject})_samples({best_sample})_start({best_start})_'
 
       ###############################################################################
       # Data loading
       ###############################################################################
 
-      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subject=subject, samples=best_sample, start=best_start,
-                              lowcut=best_lowcut, highcut=best_highcut, order=best_order)
+      dataset = SEEDDataset(sets_path+info_str, subject=subject, samples=best_sample, start=best_start)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -119,7 +106,7 @@ def train_DREAMER(config):
       model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
                   dropoutRate=config['dropout'], kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device)
 
-      loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
+      loss_fn = torch.nn.CrossEntropyLoss()
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
 
 
