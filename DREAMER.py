@@ -42,11 +42,12 @@ test_split = .33
 
 best_lr = 0.001
 best_batch_size = 128
-best_F1 = 32
+best_F1 = 64
 best_D = 8
-best_F2 = 256
-best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
-best_dropout = .3
+best_F2 = 64
+best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
+best_dropout = .1
+best_scale = .01
 
 selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
@@ -61,7 +62,7 @@ cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
 sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
-save = False
+save = True
 
 np.random.seed(random_seed)
 num_s = 1
@@ -79,11 +80,11 @@ search_space = {
     "order": best_order, # tune.grid_search([3, 5]),
     "lowcut": best_lowcut, # tune.grid_search([.5, .3]),
     "highcut": best_highcut, # tune.grid_search([None, 60, 63]),
-    "F1": tune.grid_search([4, 8, 16, 32, 64]),
-    "D": tune.grid_search([1, 2, 4, 8, 16]),
-    "F2": tune.grid_search([4, 16, 64, 256, 1024]),
-    "kernLength": tune.grid_search([16, 32, 64, 128]),
-    "dropout": tune.grid_search([.1, .3, .5])
+    "F1": best_F1, # tune.grid_search([4, 8, 16, 32, 64]),
+    "D": best_D, # tune.grid_search([1, 2, 4, 8, 16]),
+    "F2": best_F2, # tune.grid_search([4, 16, 64, 256, 1024]),
+    "kernLength": best_kernLength, # tune.grid_search([16, 32, 64, 128]),
+    "dropout": best_dropout, # tune.grid_search([.1, .3, .5])
 }
 
 def train_DREAMER(config):
@@ -95,7 +96,7 @@ def train_DREAMER(config):
       ###############################################################################
 
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, samples=config["sample"], start=config["start"],
-                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], save=save)
+                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], scale=best_scale, save=save)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -130,7 +131,7 @@ def train_DREAMER(config):
 
       for epoch in range(epochs):
             _ = train_f(model, train_loader, optimizer, loss_fn, device)
-            acc, _ = test_f(model, test_loader, device)
+            acc, _ = test_f(model, test_loader, loss_fn, device)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None

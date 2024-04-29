@@ -8,7 +8,7 @@ import pandas as pd
 
 
 class SEEDDataset(Dataset):
-    def __init__(self, path, subjects=None, samples=200, start=0):
+    def __init__(self, path, subjects=None, samples=200, start=0, save=False):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -16,18 +16,19 @@ class SEEDDataset(Dataset):
             self.targets = torch.load(path + 'targets.pt')
         else:
             print("Building dataset.")
-            self._build(path, subjects, samples, start)
+            self._build(path, subjects, samples, start, save)
 
 
-    def _build(self, path, subjects=None, samples=200, start=0):
+    def _build(self, path, subjects=None, samples=200, start=0, save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/SEED/SEED_EEG/Preprocessed_EEG/'
 
-        sr = 200
-        n_subjects = 15
+        # sr = 200
+        # n_subjects = 15
+        # n_sessions = 3
         n_videos = 15
-        n_sessions = 3
-        files_mat = [f for f in os.listdir(data_path) if f.endswith('.mat')].remove('label.mat')
+        n_classes = 3
+        files_mat = [f for f in os.listdir(data_path) if f.endswith('.mat') and f != 'label.mat']
         labels_mat = scipy.io.loadmat(data_path + 'label.mat')
         labels = labels_mat['label'][0]
 
@@ -38,7 +39,8 @@ class SEEDDataset(Dataset):
             for file in files_mat:
                 mat = scipy.io.loadmat(data_path + file)
                 for j in range(n_videos):
-                    stimuli_eeg_j = mat[f'xyl_eeg{j+1}'].T
+                    key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
+                    stimuli_eeg_j = mat[key].T
                     stimuli_eeg_j -= np.mean(stimuli_eeg_j, axis=0)
                     stimuli_eeg_j /= np.std(stimuli_eeg_j, axis=0)
                     l = stimuli_eeg_j.shape[0]
@@ -53,7 +55,8 @@ class SEEDDataset(Dataset):
                 for file in filtered_files_mat:
                     mat = scipy.io.loadmat(data_path + file)
                     for j in range(n_videos):
-                        stimuli_eeg_j = mat[f'xyl_eeg{j+1}'].T
+                        key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
+                        stimuli_eeg_j = mat[key].T
                         stimuli_eeg_j -= np.mean(stimuli_eeg_j, axis=0)
                         stimuli_eeg_j /= np.std(stimuli_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
@@ -64,8 +67,9 @@ class SEEDDataset(Dataset):
         X = torch.stack(X)
         torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
-        self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=3).float()
-        self._save(path)
+        self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
+        if save:
+            self._save(path)
 
     def __len__(self):
         return len(self.data)

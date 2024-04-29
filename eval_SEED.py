@@ -21,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.ba
 print('Using device:', device)
 
 best_start = 1
-best_sample = 256
+best_sample = 200
 subjects = [[i] for i in range(15)]
 
 epochs_dep = 800
@@ -48,11 +48,12 @@ cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
 sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
+save = False
 
 np.random.seed(random_seed)
 num_s = 1
 dependent = True
-independent = True
+independent = False
 
 
 ###############################################################################
@@ -71,7 +72,7 @@ if dependent:
         # Data loading
         ###############################################################################
 
-        dataset = SEEDDataset(sets_path+info_str, subjects=subject, samples=best_sample, start=best_start)
+        dataset = SEEDDataset(sets_path+info_str, subjects=subject, samples=best_sample, start=best_start, save=save)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))
@@ -106,9 +107,9 @@ if dependent:
 
         for epoch in range(epochs_dep):
             loss = train_f(model, train_loader, optimizer, loss_fn, device)
-            acc = test_f(model, test_loader, device)
+            acc, loss_test = test_f(model, test_loader, loss_fn, device)
             if epoch % 100 == 0:
-                print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}")
+                print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
         for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
             X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
@@ -140,8 +141,8 @@ if independent:
         subjects_train = [i for i in range(23) if i != subject[0]]
         info_str_train = 'SEED_' + selected_emotion + f'_subject({subjects_train})_samples({best_sample})_start({best_start})_'
         subjects_test = subject
-        dataset_train = SEEDDataset(sets_path+info_str_train, subjects=subjects_train, samples=best_sample, start=best_start)
-        dataset_test = SEEDDataset(sets_path+info_str_test, subjects=subjects_test, samples=best_sample, start=best_start)
+        dataset_train = SEEDDataset(sets_path+info_str_train, subjects=subjects_train, samples=best_sample, start=best_start, save=save)
+        dataset_test = SEEDDataset(sets_path+info_str_test, subjects=subjects_test, samples=best_sample, start=best_start, save=save)
         dataset_train_size = len(dataset_train)
         dataset_test_size = len(dataset_test)
 

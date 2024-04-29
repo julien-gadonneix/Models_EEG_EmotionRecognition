@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class DREAMERDataset(Dataset):
-    def __init__(self, path, emotion, subjects=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
+    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, scale=.01, save=False):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -17,10 +17,10 @@ class DREAMERDataset(Dataset):
             # self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
-            self._build(path, emotion, subjects, samples, start, lowcut, highcut, order, save)
+            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, scale, save)
 
 
-    def _build(self, path, emotion, subjects=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
+    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, scale=.01, save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
@@ -28,69 +28,128 @@ class DREAMERDataset(Dataset):
         eeg_sr = int(eeg_sr[0, 0])
         n_subjects = int(n_subjects[0, 0])
         n_videos = int(n_videos[0, 0])
+        n_classes = 5
 
         X = []
         y = []
         if subjects is None:
-            print("Dataset with all subjects")
+            print("Dataset with all subjects mixed...")
             for i in range(n_subjects):
                 _, _, eeg, _, val, aro, dom = data[0, i][0][0]
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
-                for j in range(n_videos):
-                    stimuli_eeg_j = stimuli_eeg[j, 0]
-                    stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
-                                          method='iir', 
-                                          iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                    baseline_eeg_j = baseline_eeg[j, 0]
-                    baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
-                                          method='iir', 
-                                          iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                    stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
-                    stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
-                    for k in range((stimuli_eeg_j.shape[0]//samples)-start):
+                if sessions is None:
+                    if i == 0:
+                        print("... and all sessions mixed.")
+                    for j in range(n_videos):
+                        stimuli_eeg_j = stimuli_eeg[j, 0]
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        baseline_eeg_j = baseline_eeg[j, 0]
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
+                        stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
-                        X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
-                        # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
-                        if emotion == 'valence':
-                            y.append(val[j, 0]-1)
-                        elif emotion == 'arousal':
-                            y.append(aro[j, 0]-1)
-                        elif emotion == 'dominance':
-                            y.append(dom[j, 0]-1)
-                        else:
-                            raise ValueError('Invalid emotion')
+                        for k in range((stimuli_eeg_j.shape[0]//samples)-start):
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32)) # scale due to scaling sensitivity in DL
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32)) # scale due to scaling sensitivity in DL
+                            if emotion == 'valence':
+                                y.append(val[j, 0]-1)
+                            elif emotion == 'arousal':
+                                y.append(aro[j, 0]-1)
+                            elif emotion == 'dominance':
+                                y.append(dom[j, 0]-1)
+                            else:
+                                raise ValueError('Invalid emotion')
+                else:
+                    if i == 0:
+                        print("... and session(s):", sessions)
+                    for sess in sessions:
+                        stimuli_eeg_j = stimuli_eeg[sess, 0]
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        baseline_eeg_j = baseline_eeg[sess, 0]
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
+                        stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
+                        l = stimuli_eeg_j.shape[0]
+                        for k in range((stimuli_eeg_j.shape[0]//samples)-start):
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32))
+                            if emotion == 'valence':
+                                y.append(val[sess, 0]-1)
+                            elif emotion == 'arousal':
+                                y.append(aro[sess, 0]-1)
+                            elif emotion == 'dominance':
+                                y.append(dom[sess, 0]-1)
+                            else:
+                                raise ValueError('Invalid emotion')
         else:
-            print("Dataset with subject ", subjects)
+            print("Dataset with subjects:", subjects, "...")
             for subject in subjects:
                 _, _, eeg, _, val, aro, dom = data[0, subject][0][0]
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
-                for j in range(n_videos):
-                    stimuli_eeg_j = stimuli_eeg[j, 0]
-                    stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
-                                        method='iir', 
-                                        iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                    baseline_eeg_j = baseline_eeg[j, 0]
-                    baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
-                                        method='iir', 
-                                        iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                    stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
-                    stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
-                    for k in range((stimuli_eeg_j.shape[0]//samples)-start):
+                if sessions is None:
+                    if subject == subjects[0]:
+                        print("... and all sessions mixed.")
+                    for j in range(n_videos):
+                        stimuli_eeg_j = stimuli_eeg[j, 0]
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        baseline_eeg_j = baseline_eeg[j, 0]
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
+                        stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
-                        X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
-                        # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
-                        if emotion == 'valence':
-                            y.append(val[j, 0]-1)
-                        elif emotion == 'arousal':
-                            y.append(aro[j, 0]-1)
-                        elif emotion == 'dominance':
-                            y.append(dom[j, 0]-1)
-                        else:
-                            raise ValueError('Invalid emotion')
+                        for k in range((stimuli_eeg_j.shape[0]//samples)-start):
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
+                            if emotion == 'valence':
+                                y.append(val[j, 0]-1)
+                            elif emotion == 'arousal':
+                                y.append(aro[j, 0]-1)
+                            elif emotion == 'dominance':
+                                y.append(dom[j, 0]-1)
+                            else:
+                                raise ValueError('Invalid emotion')
+                else:
+                    if subject == subjects[0]:
+                        print("... and session(s):", sessions)
+                    for sess in sessions:
+                        stimuli_eeg_j = stimuli_eeg[sess, 0]
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        baseline_eeg_j = baseline_eeg[sess, 0]
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
+                                            method='iir', 
+                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                        stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
+                        stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
+                        l = stimuli_eeg_j.shape[0]
+                        for k in range((stimuli_eeg_j.shape[0]//samples)-start):
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * 1000, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * 1000, dtype=torch.float32))
+                            if emotion == 'valence':
+                                y.append(val[sess, 0]-1)
+                            elif emotion == 'arousal':
+                                y.append(aro[sess, 0]-1)
+                            elif emotion == 'dominance':
+                                y.append(dom[sess, 0]-1)
+                            else:
+                                raise ValueError('Invalid emotion')
         X = torch.stack(X)
         torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
-        self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=5).float()
+        self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
         # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0))
         if save:
             self._save(path)

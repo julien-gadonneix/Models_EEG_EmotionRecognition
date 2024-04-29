@@ -21,29 +21,31 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.ba
 print('Using device:', device)
 
 best_highcut = None
-best_lowcut = .5
+best_lowcut = .3
 best_order = 3
 best_start = 1
-best_sample = 256
+best_sample = 128
 subjects = [[i] for i in range(23)]
+sessions = [[i] for i in range(18)]
 
-epochs_dep = 800
+epochs_dep_mix = 800
+epochs_dep_ind = 800
 epochs_ind = 100
 random_seed= 42
 test_split = .33
 
 best_lr = 0.001
 best_batch_size = 128
-best_F1 = 32
+best_F1 = 64
 best_D = 8
-best_F2 = 256
-best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
-best_dropout = .3
+best_F2 = 64
+best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
+best_dropout = .1
+best_scale = .01
 
-selected_emotion = 'dominance'
+selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
 names = ['1', '2', '3', '4', '5']
-print('Selected emotion:', selected_emotion)
 
 n_components = 2  # pick some components for xDawnRG
 nb_classes = 5
@@ -57,28 +59,29 @@ save = False
 
 np.random.seed(random_seed)
 num_s = 1
-dependent = True
+dep_mix = True
+dep_ind = True
 independent = False
 
 
 ###############################################################################
-# Subject-dependent classification
+# Subject-dependent mixed sessions classification
 ###############################################################################
 
-if dependent:
+if dep_mix:
     preds = []
     Y_test = []
     for subject in subjects:
 
-        info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
+        info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sessions})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
 
 
         ###############################################################################
         # Data loading
         ###############################################################################
 
-        dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
+        dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, scale=best_scale, save=save)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))
@@ -111,7 +114,7 @@ if dependent:
         # Train and test
         ###############################################################################
 
-        for epoch in range(epochs_dep):
+        for epoch in range(epochs_dep_mix):
             loss = train_f(model, train_loader, optimizer, loss_fn, device)
             acc, loss_test = test_f(model, test_loader, loss_fn, device)
             if epoch % 100 == 0:
@@ -127,6 +130,80 @@ if dependent:
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
+
+###############################################################################
+# Subject-dependent session-independent classification
+###############################################################################
+
+if dep_ind:
+    preds = []
+    Y_test = []
+    for subject in subjects:
+        for sess in sessions:
+
+            info_str_test = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sess})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
+
+
+            ###############################################################################
+            # Data loading
+            ###############################################################################
+
+            sess_train = [i for i in range(18) if i != sess[0]]
+            info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sess_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
+            sess_test = sess
+            dataset_train = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
+            dataset_test = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
+            dataset_train_size = len(dataset)
+            dataset_test_size = len(dataset)
+
+            train_indices = list(range(dataset_train_size))
+            test_indices = list(range(dataset_test_size))
+            np.random.shuffle(train_indices)
+            np.random.shuffle(test_indices)
+
+            # Creating data samplers and loaders:
+            train_sampler = SubsetRandomSampler(train_indices)
+            test_sampler = SubsetRandomSampler(test_indices)
+            train_loader = DataLoader(dataset_train, batch_size=best_batch_size, sampler=train_sampler)
+            test_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=test_sampler)
+
+            print(len(train_indices), 'train samples')
+            print(len(test_indices), 'test samples')
+
+
+            ###############################################################################
+            # Model configurations
+            ###############################################################################
+
+            model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
+                        dropoutRate=best_dropout, kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device)
+
+            loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+
+
+            ###############################################################################
+            # Train and test
+            ###############################################################################
+
+            for epoch in range(epochs_dep_ind):
+                loss = train_f(model, train_loader, optimizer, loss_fn, device)
+                acc, loss_test = test_f(model, test_loader, loss_fn, device)
+                if epoch % 10 == 0:
+                    print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
+
+            for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+                y_pred = model(X_batch)
+                _, predicted = torch.max(y_pred.data, 1)
+                preds.append(predicted.cpu().numpy())
+                _, target = torch.max(Y_batch, 1)
+                Y_test.append(target.cpu().numpy())
+
+    classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
+                            
 
 ###############################################################################
 # Subject-independent classification
