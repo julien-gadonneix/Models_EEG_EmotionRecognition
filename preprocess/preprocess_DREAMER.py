@@ -110,8 +110,8 @@ class DREAMERDataset(Dataset):
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
-                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
-                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * 1000, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
                             if emotion == 'valence':
                                 y.append(val[j, 0]-1)
                             elif emotion == 'arousal':
@@ -136,8 +136,8 @@ class DREAMERDataset(Dataset):
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
-                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * 1000, dtype=torch.float32))
-                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * 1000, dtype=torch.float32))
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32))
                             if emotion == 'valence':
                                 y.append(val[sess, 0]-1)
                             elif emotion == 'arousal':
