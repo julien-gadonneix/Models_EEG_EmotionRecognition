@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class DREAMERDataset(Dataset):
-    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, scale=.01, save=False):
+    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -17,10 +17,10 @@ class DREAMERDataset(Dataset):
             # self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
-            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, scale, save)
+            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, save)
 
 
-    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, scale=.01, save=False):
+    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
@@ -53,8 +53,8 @@ class DREAMERDataset(Dataset):
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
-                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32)) # scale due to scaling sensitivity in DL
-                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32)) # scale due to scaling sensitivity in DL
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                             if emotion == 'valence':
                                 y.append(val[j, 0]-1)
                             elif emotion == 'arousal':
@@ -79,8 +79,8 @@ class DREAMERDataset(Dataset):
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
-                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32))
-                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32))
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                             if emotion == 'valence':
                                 y.append(val[sess, 0]-1)
                             elif emotion == 'arousal':
@@ -110,8 +110,8 @@ class DREAMERDataset(Dataset):
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
-                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
-                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32)) # scale by 1000 due to scaling sensitivity in DL
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                             if emotion == 'valence':
                                 y.append(val[j, 0]-1)
                             elif emotion == 'arousal':
@@ -136,8 +136,8 @@ class DREAMERDataset(Dataset):
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
-                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T * scale, dtype=torch.float32))
-                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T * scale, dtype=torch.float32))
+                            X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
+                            # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                             if emotion == 'valence':
                                 y.append(val[sess, 0]-1)
                             elif emotion == 'arousal':

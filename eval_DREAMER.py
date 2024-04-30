@@ -32,7 +32,7 @@ epochs_dep_mix = 800
 epochs_dep_ind = 800
 epochs_ind = 100
 random_seed= 42
-test_split = .33
+test_split = .25
 
 best_lr = 0.001
 best_batch_size = 128
@@ -41,7 +41,6 @@ best_D = 8
 best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
-best_scale = .01
 
 selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
@@ -81,7 +80,7 @@ if dep_mix:
         ###############################################################################
 
         dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, scale=best_scale, save=save)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))

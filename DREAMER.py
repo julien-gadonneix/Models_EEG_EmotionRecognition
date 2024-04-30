@@ -38,7 +38,7 @@ subjects = None
 
 epochs = 500
 random_seed= 42
-test_split = .33
+test_split = .25
 
 best_lr = 0.001
 best_batch_size = 128
@@ -47,7 +47,6 @@ best_D = 8
 best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
-best_scale = .01
 
 selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
@@ -84,7 +83,7 @@ search_space = {
     "D": best_D, # tune.grid_search([1, 2, 4, 8, 16]),
     "F2": best_F2, # tune.grid_search([4, 16, 64, 256, 1024]),
     "kernLength": best_kernLength, # tune.grid_search([16, 32, 64, 128]),
-    "dropout": best_dropout, # tune.grid_search([.1, .3, .5])
+    "dropout": best_dropout # tune.grid_search([.1, .3, .5])
 }
 
 def train_DREAMER(config):
@@ -96,7 +95,7 @@ def train_DREAMER(config):
       ###############################################################################
 
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, samples=config["sample"], start=config["start"],
-                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], scale=best_scale, save=save)
+                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], save=save)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
