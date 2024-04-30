@@ -26,7 +26,11 @@ from ray.tune.schedulers import ASHAScheduler
 ###############################################################################
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-print('Using device:', device)
+if device.type != "cuda":
+      raise Exception("CUDA not available. Please select a GPU device.")
+else:
+      print('Using device:', device)
+properties = torch.cuda.get_device_properties(device)
 
 best_highcut = None
 best_lowcut = .3
@@ -143,11 +147,13 @@ def train_DREAMER(config):
 
                   train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
-ray.init(num_cpus=16, num_gpus=1)
-# ray.init(num_cpus=8, num_gpus=1)
+n_cpu = os.cpu_count()
+n_gpu = torch.cuda.device_count()
+n_parallel = 4
+ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
 tuner = tune.Tuner(
 #     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 2, "GPU": .25, "accelerator_type:P620": .25}])),
-    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 4, "GPU": .25, "accelerator_type:RTX": .25}])),
+    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/4, "GPU": n_gpu/4, f"accelerator_type:RTX": n_gpu/4}])),
     run_config=train.RunConfig(
           checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
           verbose=0

@@ -150,12 +150,12 @@ if dep_ind:
             sess_train = [i for i in range(18) if i != sess[0]]
             info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sess_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
             sess_test = sess
-            dataset_train = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
+            dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
                                     lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
-            dataset_test = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
+            dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
                                     lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
-            dataset_train_size = len(dataset)
-            dataset_test_size = len(dataset)
+            dataset_train_size = len(dataset_train)
+            dataset_test_size = len(dataset_test)
 
             train_indices = list(range(dataset_train_size))
             test_indices = list(range(dataset_test_size))
@@ -190,7 +190,7 @@ if dep_ind:
             for epoch in range(epochs_dep_ind):
                 loss = train_f(model, train_loader, optimizer, loss_fn, device)
                 acc, loss_test = test_f(model, test_loader, loss_fn, device)
-                if epoch % 10 == 0:
+                if epoch % 100 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
             for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
@@ -201,7 +201,7 @@ if dep_ind:
                 _, target = torch.max(Y_batch, 1)
                 Y_test.append(target.cpu().numpy())
 
-    classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
+    classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent_session_independent')
                             
 
 ###############################################################################
