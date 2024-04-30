@@ -149,11 +149,11 @@ def train_DREAMER(config):
 
 n_cpu = os.cpu_count()
 n_gpu = torch.cuda.device_count()
+accelerator = properties["name"].split()[1]
 n_parallel = 4
 ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
 tuner = tune.Tuner(
-#     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 2, "GPU": .25, "accelerator_type:P620": .25}])),
-    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/4, "GPU": n_gpu/4, f"accelerator_type:RTX": n_gpu/4}])),
+    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/4, "GPU": n_gpu/4, f"accelerator_type:{accelerator}": n_gpu/4}])),
     run_config=train.RunConfig(
           checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
           verbose=0
