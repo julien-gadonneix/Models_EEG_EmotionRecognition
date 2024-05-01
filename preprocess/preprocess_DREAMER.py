@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class DREAMERDataset(Dataset):
-    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
+    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, type="butter", save=False):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -17,10 +17,10 @@ class DREAMERDataset(Dataset):
             # self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
-            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, save)
+            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, type, save)
 
 
-    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, save=False):
+    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, type="butter", save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
@@ -42,13 +42,13 @@ class DREAMERDataset(Dataset):
                         print("... and all sessions mixed.")
                     for j in range(n_videos):
                         stimuli_eeg_j = stimuli_eeg[j, 0]
+                        baseline_eeg_j = baseline_eeg[j, 0]
                         stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                        baseline_eeg_j = baseline_eeg[j, 0]
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
@@ -67,14 +67,14 @@ class DREAMERDataset(Dataset):
                     if i == 0:
                         print("... and session(s):", sessions)
                     for sess in sessions:
-                        stimuli_eeg_j = stimuli_eeg[sess, 0]
+                        stimuli_eeg_j = stimuli_eeg[j, 0]
+                        baseline_eeg_j = baseline_eeg[j, 0]
                         stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                        baseline_eeg_j = baseline_eeg[sess, 0]
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
@@ -99,13 +99,13 @@ class DREAMERDataset(Dataset):
                         print("... and all sessions mixed.")
                     for j in range(n_videos):
                         stimuli_eeg_j = stimuli_eeg[j, 0]
+                        baseline_eeg_j = baseline_eeg[j, 0]
                         stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                        baseline_eeg_j = baseline_eeg[j, 0]
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]
@@ -124,14 +124,14 @@ class DREAMERDataset(Dataset):
                     if subject == subjects[0]:
                         print("... and session(s):", sessions)
                     for sess in sessions:
-                        stimuli_eeg_j = stimuli_eeg[sess, 0]
+                        stimuli_eeg_j = stimuli_eeg[j, 0]
+                        baseline_eeg_j = baseline_eeg[j, 0]
                         stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
-                        baseline_eeg_j = baseline_eeg[sess, 0]
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
-                                            iir_params=dict(order=order, ftype='butterworth'), verbose=False).T
+                                            iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
                         stimuli_eeg_j -= np.mean(baseline_eeg_j, axis=0)
                         stimuli_eeg_j /= np.std(baseline_eeg_j, axis=0)
                         l = stimuli_eeg_j.shape[0]

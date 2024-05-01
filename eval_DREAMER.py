@@ -21,8 +21,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.ba
 print('Using device:', device)
 
 best_highcut = None
-best_lowcut = .3
+best_lowcut = .5
 best_order = 3
+best_type = 'butter'
 best_start = 1
 best_sample = 128
 subjects = [[i] for i in range(23)]
@@ -59,8 +60,8 @@ save = False
 np.random.seed(random_seed)
 num_s = 1
 dep_mix = True
-dep_ind = True
-independent = False
+dep_ind = False
+independent = True
 
 
 ###############################################################################
@@ -80,7 +81,7 @@ if dep_mix:
         ###############################################################################
 
         dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))
@@ -151,9 +152,9 @@ if dep_ind:
             info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sess_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
             sess_test = sess
             dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
-                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
             dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
-                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, save=save)
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
             dataset_train_size = len(dataset_train)
             dataset_test_size = len(dataset_test)
 
@@ -224,9 +225,9 @@ if independent:
         info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subjects_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
         subjects_test = subject
         dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subjects_train, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
         dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subjects_test, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
         dataset_train_size = len(dataset_train)
         dataset_test_size = len(dataset_test)
 

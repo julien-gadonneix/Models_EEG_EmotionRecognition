@@ -33,8 +33,9 @@ else:
 properties = torch.cuda.get_device_properties(device)
 
 best_highcut = None
-best_lowcut = .3
+best_lowcut = .5
 best_order = 3
+best_type = 'butter'
 best_start = 1
 best_sample = 128
 # subjects = [i for i in range(23)]
@@ -65,7 +66,7 @@ cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
 sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
-save = True
+save = False
 
 np.random.seed(random_seed)
 num_s = 1
@@ -87,7 +88,8 @@ search_space = {
     "D": best_D, # tune.grid_search([1, 2, 4, 8, 16]),
     "F2": best_F2, # tune.grid_search([4, 16, 64, 256, 1024]),
     "kernLength": best_kernLength, # tune.grid_search([16, 32, 64, 128]),
-    "dropout": best_dropout # tune.grid_search([.1, .3, .5])
+    "dropout": best_dropout, # tune.grid_search([.1, .3, .5])
+    "type": best_type, # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
 }
 
 def train_DREAMER(config):
@@ -99,7 +101,7 @@ def train_DREAMER(config):
       ###############################################################################
 
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, samples=config["sample"], start=config["start"],
-                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], save=save)
+                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -149,7 +151,7 @@ def train_DREAMER(config):
 
 n_cpu = os.cpu_count()
 n_gpu = torch.cuda.device_count()
-accelerator = properties["name"].split()[1]
+accelerator = properties.name.split()[1]
 n_parallel = 4
 ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
 tuner = tune.Tuner(
