@@ -31,6 +31,10 @@ if device.type != "cuda":
 else:
       print('Using device:', device)
 properties = torch.cuda.get_device_properties(device)
+n_cpu = os.cpu_count()
+n_gpu = torch.cuda.device_count()
+accelerator = properties.name.split()[1]
+n_parallel = 4
 
 best_highcut = None
 best_lowcut = .5
@@ -112,8 +116,8 @@ def train_DREAMER(config):
       # Creating data samplers and loaders:
       train_sampler = SubsetRandomSampler(train_indices)
       test_sampler = SubsetRandomSampler(test_indices)
-      train_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=train_sampler)
-      test_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=test_sampler)
+      train_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=train_sampler, num_workers=n_gpu*n_parallel, pin_memory=True)
+      test_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=test_sampler, num_workers=n_gpu*n_parallel, pin_memory=True)
 
       print(len(train_indices), 'train samples')
       print(len(test_indices), 'test samples')
@@ -123,11 +127,14 @@ def train_DREAMER(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], 
-                  dropoutRate=config['dropout'], kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device)
+      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], dropoutRate=config['dropout'], 
+                     kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-      loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
+      loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
+      scaler = torch.cuda.amp.GradScaler()
+
+      torch.backends.cudnn.benchmark = True
 
 
       ###############################################################################
@@ -135,7 +142,7 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, device)
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device)
             acc, _ = test_f(model, test_loader, loss_fn, device)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
@@ -149,13 +156,9 @@ def train_DREAMER(config):
 
                   train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
-n_cpu = os.cpu_count()
-n_gpu = torch.cuda.device_count()
-accelerator = properties.name.split()[1]
-n_parallel = 4
 ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
 tuner = tune.Tuner(
-    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/4, "GPU": n_gpu/4, f"accelerator_type:{accelerator}": n_gpu/4}])),
+    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
     run_config=train.RunConfig(
           checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
           verbose=0
