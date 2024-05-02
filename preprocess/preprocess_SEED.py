@@ -21,7 +21,7 @@ class SEEDDataset(Dataset):
 
     def _build(self, path, subjects=None, samples=200, start=0, save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
-        data_path = str(wdir) + '/data/SEED/SEED_EEG/Preprocessed_EEG/'
+        data_path = str(wdir) + '/data/SEED/'
 
         # sr = 200
         # n_subjects = 15

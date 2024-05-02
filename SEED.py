@@ -34,15 +34,15 @@ subject = None
 
 epochs = 800
 random_seed= 42
-test_split = .33
+test_split = .25
 
 best_lr = 0.001
 best_batch_size = 128
-best_F1 = 32
+best_F1 = 64
 best_D = 8
-best_F2 = 256
-best_kernLength = 32 # maybe go back to 64 because now f_min = 4Hz
-best_dropout = .3
+best_F2 = 64
+best_kernLength = 16 # maybe go back to 64 because now f_min = 4Hz
+best_dropout = .1
 
 names = ['Negative', 'Neutral', 'Positive']
 
