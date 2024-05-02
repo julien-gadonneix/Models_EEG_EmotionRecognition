@@ -124,13 +124,14 @@ if dep_mix:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
         draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
-        for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-            X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-            y_pred = model(X_batch)
-            _, predicted = torch.max(y_pred.data, 1)
-            preds.append(predicted.cpu().numpy())
-            _, target = torch.max(Y_batch, 1)
-            Y_test.append(target.cpu().numpy())
+        with torch.no_grad():
+            for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+                y_pred = model(X_batch)
+                _, predicted = torch.max(y_pred.data, 1)
+                preds.append(predicted.cpu().numpy())
+                _, target = torch.max(Y_batch, 1)
+                Y_test.append(target.cpu().numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
@@ -198,13 +199,14 @@ if dep_ind:
                 if epoch % 100 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
-            for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-                y_pred = model(X_batch)
-                _, predicted = torch.max(y_pred.data, 1)
-                preds.append(predicted.cpu().numpy())
-                _, target = torch.max(Y_batch, 1)
-                Y_test.append(target.cpu().numpy())
+            with torch.no_grad():
+                for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                    X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+                    y_pred = model(X_batch)
+                    _, predicted = torch.max(y_pred.data, 1)
+                    preds.append(predicted.cpu().numpy())
+                    _, target = torch.max(Y_batch, 1)
+                    Y_test.append(target.cpu().numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent_session_independent')
                             
@@ -271,13 +273,14 @@ if independent:
             if epoch % 1 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
-        for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-            X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-            y_pred = model(X_batch)
-            _, predicted = torch.max(y_pred.data, 1)
-            preds.append(predicted.cpu().numpy())
-            _, target = torch.max(Y_batch, 1)
-            Y_test.append(target.cpu().numpy())
+        with torch.no_grad():
+            for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+                y_pred = model(X_batch)
+                _, predicted = torch.max(y_pred.data, 1)
+                preds.append(predicted.cpu().numpy())
+                _, target = torch.max(Y_batch, 1)
+                Y_test.append(target.cpu().numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'independent')
 
