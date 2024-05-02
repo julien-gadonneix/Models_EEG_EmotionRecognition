@@ -58,9 +58,8 @@ models_path = str(cur_dir) + '/tmp/'
 save = False
 
 np.random.seed(random_seed)
-num_s = 1
-dep_mix = True
-dep_ind = False
+dep_mix = False
+dep_ind = True
 independent = True
 
 

@@ -67,8 +67,8 @@ class DREAMERDataset(Dataset):
                     if i == 0:
                         print("... and session(s):", sessions)
                     for sess in sessions:
-                        stimuli_eeg_j = stimuli_eeg[j, 0]
-                        baseline_eeg_j = baseline_eeg[j, 0]
+                        stimuli_eeg_j = stimuli_eeg[sess, 0]
+                        baseline_eeg_j = baseline_eeg[sess, 0]
                         stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
                                             iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
@@ -124,8 +124,8 @@ class DREAMERDataset(Dataset):
                     if subject == subjects[0]:
                         print("... and session(s):", sessions)
                     for sess in sessions:
-                        stimuli_eeg_j = stimuli_eeg[j, 0]
-                        baseline_eeg_j = baseline_eeg[j, 0]
+                        stimuli_eeg_j = stimuli_eeg[sess, 0]
+                        baseline_eeg_j = baseline_eeg[sess, 0]
                         stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, 
                                             method='iir', 
                                             iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False).T
