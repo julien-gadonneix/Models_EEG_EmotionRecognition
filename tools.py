@@ -53,6 +53,17 @@ def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, m
     plt.savefig(figs_path + 'confusion_matrix_subject_' + mode + '_classification_' + selected_emotion +'.png')
 
 
+def draw_loss(losses_train, losses_test, figs_path, selected_emotion, subject):
+    plt.plot(losses_train, label='Train loss')
+    plt.plot(losses_test, label='Test loss')
+    plt.title("Loss on " + selected_emotion + " of subject " + subject)
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(figs_path + 'loss_subject' + subject + '_' + selected_emotion + '.png')
+
+
 def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str):
     # code is taken from PyRiemann's ERP sample script, which is decoding in 
     # the tangent space with a logistic regression

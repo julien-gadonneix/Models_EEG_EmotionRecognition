@@ -24,7 +24,7 @@ best_start = 1
 best_sample = 200
 subjects = [[i] for i in range(15)]
 
-epochs_dep = 800
+epochs_dep = 300
 epochs_ind = 100
 random_seed= 42
 test_split = .33

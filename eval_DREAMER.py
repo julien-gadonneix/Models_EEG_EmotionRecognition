@@ -8,7 +8,7 @@ from pathlib import Path
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train_f, test_f, xDawnRG, classification_accuracy
+from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -58,9 +58,9 @@ models_path = str(cur_dir) + '/tmp/'
 save = False
 
 np.random.seed(random_seed)
-dep_mix = False
-dep_ind = True
-independent = True
+dep_mix = True
+dep_ind = False
+independent = False
 
 
 ###############################################################################
@@ -113,11 +113,16 @@ if dep_mix:
         # Train and test
         ###############################################################################
 
+        losses_train = []
+        losses_test = []
         for epoch in range(epochs_dep_mix):
             loss = train_f(model, train_loader, optimizer, loss_fn, device)
+            losses_train.append(loss)
             acc, loss_test = test_f(model, test_loader, loss_fn, device)
+            losses_test.append(loss_test)
             if epoch % 100 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
+        draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
         for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
             X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
