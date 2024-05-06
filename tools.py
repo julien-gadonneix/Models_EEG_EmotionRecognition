@@ -10,13 +10,17 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import confusion_matrix
 
 
-def train_f(model, train_loader, optimizer, loss_fn, scaler, device):
+def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
     model.train()
     avg_loss = 0
     for batch_index, (X_batch, Y_batch) in enumerate(train_loader):
         X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         optimizer.zero_grad(set_to_none=True)
-        with torch.autocast(device_type=device.type, dtype=torch.float16):
+        if is_ok:
+            with torch.autocast(device_type=device.type, dtype=torch.float16):
+                y_pred = model(X_batch)
+                loss = loss_fn(y_pred, Y_batch)
+        else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, Y_batch)
         avg_loss += loss.item()
@@ -27,7 +31,7 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device):
     
 
 
-def test_f(model, test_loader, loss_fn, device):
+def test_f(model, test_loader, loss_fn, device, is_ok):
     model.eval()
     correct = 0
     total = 0
@@ -35,7 +39,11 @@ def test_f(model, test_loader, loss_fn, device):
     with torch.no_grad():
         for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
-            with torch.autocast(device_type=device.type, dtype=torch.float16):
+            if is_ok:
+                with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=is_ok):
+                    y_pred = model(X_batch)
+                    loss = loss_fn(y_pred, Y_batch)
+            else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, Y_batch)
             avg_loss += loss.item()

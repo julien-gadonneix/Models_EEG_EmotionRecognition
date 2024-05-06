@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
+is_ok = device.type != 'mps'
 
 best_highcut = None
 best_lowcut = .5
@@ -44,7 +45,7 @@ best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
 
-selected_emotion = 'valence'
+selected_emotion = 'arousal'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
 names = ['1', '2', '3', '4', '5']
 
@@ -105,7 +106,7 @@ if dep_mix:
         model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                        kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
+        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
         scaler = torch.cuda.amp.GradScaler()
 
@@ -119,9 +120,9 @@ if dep_mix:
         losses_train = []
         losses_test = []
         for epoch in range(epochs_dep_mix):
-            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device)
+            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
             losses_train.append(loss)
-            acc, loss_test = test_f(model, test_loader, loss_fn, device)
+            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
             losses_test.append(loss_test)
             if epoch % 100 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
@@ -130,7 +131,10 @@ if dep_mix:
         with torch.no_grad():
             for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
-                with torch.autocast(device_type=device.type, dtype=torch.float16):
+                if is_ok:
+                    with torch.autocast(device_type=device.type, dtype=torch.float16):
+                        y_pred = model(X_batch)
+                else:
                     y_pred = model(X_batch)
                 _, predicted = torch.max(y_pred.data, 1)
                 preds.append(predicted.cpu().numpy())
@@ -201,15 +205,18 @@ if dep_ind:
             ###############################################################################
 
             for epoch in range(epochs_dep_ind):
-                loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device)
-                acc, loss_test = test_f(model, test_loader, loss_fn, device)
+                loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+                acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
                 if epoch % 100 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
             with torch.no_grad():
                 for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
                     X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
-                    with torch.autocast(device_type=device.type, dtype=torch.float16):
+                    if is_ok:
+                        with torch.autocast(device_type=device.type, dtype=torch.float16):
+                            y_pred = model(X_batch)
+                    else:
                         y_pred = model(X_batch)
                     _, predicted = torch.max(y_pred.data, 1)
                     preds.append(predicted.cpu().numpy())
@@ -279,15 +286,18 @@ if independent:
         ###############################################################################
 
         for epoch in range(epochs_ind):
-            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device)
-            acc, loss_test = test_f(model, test_loader, loss_fn, device)
+            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
             if epoch % 1 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
         with torch.no_grad():
             for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
-                with torch.autocast(device_type=device.type, dtype=torch.float16):
+                if is_ok:
+                    with torch.autocast(device_type=device.type, dtype=torch.float16):
+                        y_pred = model(X_batch)
+                else:
                     y_pred = model(X_batch)
                 _, predicted = torch.max(y_pred.data, 1)
                 preds.append(predicted.cpu().numpy())
