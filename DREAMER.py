@@ -26,6 +26,7 @@ from ray.tune.schedulers import ASHAScheduler
 ###############################################################################
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+is_ok = device.type != 'mps'
 if device.type != "cuda":
       raise Exception("CUDA not available. Please select a GPU device.")
 else:
@@ -134,7 +135,7 @@ def train_DREAMER(config):
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
       scaler = torch.cuda.amp.GradScaler()
 
-      torch.backends.cudnn.benchmark = True
+      # torch.backends.cudnn.benchmark = True
 
 
       ###############################################################################
@@ -142,8 +143,8 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device)
-            acc, _ = test_f(model, test_loader, loss_fn, device)
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None

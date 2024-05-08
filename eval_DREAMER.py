@@ -108,7 +108,7 @@ if dep_mix:
 
         loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
-        scaler = torch.cuda.amp.GradScaler()
+        scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
         torch.backends.cudnn.benchmark = True
 
@@ -195,7 +195,7 @@ if dep_ind:
 
             loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
             optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
-            scaler = torch.cuda.amp.GradScaler()
+            scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
             torch.backends.cudnn.benchmark = True
 
@@ -276,7 +276,7 @@ if independent:
 
         loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
-        scaler = torch.cuda.amp.GradScaler()
+        scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
         torch.backends.cudnn.benchmark = True
 

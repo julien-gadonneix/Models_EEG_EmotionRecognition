@@ -49,7 +49,8 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
             avg_loss += loss.item()
             _, predicted = torch.max(y_pred.data, 1)
             total += Y_batch.size(0)
-            _, target = torch.max(Y_batch, 1)
+            # _, target = torch.max(Y_batch, 1)
+            target = Y_batch
             correct += (predicted == target).sum().item()
     return correct / total, avg_loss / len(test_loader)
 
