@@ -66,6 +66,7 @@ def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, m
 
 
 def draw_loss(losses_train, losses_test, figs_path, selected_emotion, subject):
+    plt.figure()
     plt.plot(losses_train, label='Train loss')
     plt.plot(losses_test, label='Test loss')
     plt.title("Loss on " + selected_emotion + " of subject " + subject)
