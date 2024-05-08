@@ -89,11 +89,11 @@ search_space = {
     "order": best_order, # tune.grid_search([3, 5]),
     "lowcut": best_lowcut, # tune.grid_search([.5, .3]),
     "highcut": best_highcut, # tune.grid_search([None, 60, 63]),
-    "F1": tune.grid_search([16, 32, 64, 128, 256]),
-    "D": tune.grid_search([2, 4, 8, 16, 32]),
-    "F2": tune.grid_search([4, 16, 64, 128, 256]),
-    "kernLength": tune.grid_search([8, 16, 32, 64]),
-    "dropout": tune.grid_search([.1, .3]),
+    "F1": best_F1, # tune.grid_search([16, 32, 64, 128, 256]),
+    "D": best_D, # tune.grid_search([2, 4, 8, 16, 32]),
+    "F2": best_F2, # tune.grid_search([4, 16, 64, 128, 256]),
+    "kernLength": best_kernLength, # tune.grid_search([8, 16, 32, 64]),
+    "dropout": best_dropout, # tune.grid_search([.1, .3]),
     "type": best_type # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
 }
 
