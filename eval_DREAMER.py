@@ -130,7 +130,7 @@ if dep_mix:
 
         with torch.no_grad():
             for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-                X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
+                X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                 if is_ok:
                     with torch.autocast(device_type=device.type, dtype=torch.float16):
                         y_pred = model(X_batch)
@@ -138,8 +138,9 @@ if dep_mix:
                     y_pred = model(X_batch)
                 _, predicted = torch.max(y_pred.data, 1)
                 preds.append(predicted.cpu().numpy())
-                _, target = torch.max(Y_batch, 1)
-                Y_test.append(target.cpu().numpy())
+                # _, target = torch.max(Y_batch, 1)
+                target = Y_batch
+                Y_test.append(target.numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
@@ -212,7 +213,7 @@ if dep_ind:
 
             with torch.no_grad():
                 for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-                    X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
+                    X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                     if is_ok:
                         with torch.autocast(device_type=device.type, dtype=torch.float16):
                             y_pred = model(X_batch)
@@ -220,8 +221,9 @@ if dep_ind:
                         y_pred = model(X_batch)
                     _, predicted = torch.max(y_pred.data, 1)
                     preds.append(predicted.cpu().numpy())
-                    _, target = torch.max(Y_batch, 1)
-                    Y_test.append(target.cpu().numpy())
+                    # _, target = torch.max(Y_batch, 1)
+                    target = Y_batch
+                    Y_test.append(target.numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent_session_independent')
                             
@@ -293,7 +295,7 @@ if independent:
 
         with torch.no_grad():
             for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-                X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
+                X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                 if is_ok:
                     with torch.autocast(device_type=device.type, dtype=torch.float16):
                         y_pred = model(X_batch)
@@ -301,8 +303,9 @@ if independent:
                     y_pred = model(X_batch)
                 _, predicted = torch.max(y_pred.data, 1)
                 preds.append(predicted.cpu().numpy())
-                _, target = torch.max(Y_batch, 1)
-                Y_test.append(target.cpu().numpy())
+                # _, target = torch.max(Y_batch, 1)
+                target = Y_batch
+                Y_test.append(target.numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'independent')
 
