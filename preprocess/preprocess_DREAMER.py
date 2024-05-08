@@ -150,7 +150,7 @@ class DREAMERDataset(Dataset):
         torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
         # self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
-        self.targets = torch.tensor(y, dtype=torch.float32)
+        self.targets = torch.tensor(y, dtype=torch.long)
         # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0))
         if save:
             self._save(path)
