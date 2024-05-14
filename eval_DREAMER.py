@@ -62,7 +62,7 @@ save = False
 np.random.seed(random_seed)
 dep_mix = True
 dep_ind = False
-independent = False
+independent = True
 
 
 ###############################################################################
