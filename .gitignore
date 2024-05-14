@@ -14,3 +14,4 @@ logs/
 # Ignore results
 tmp/
 sets/
+figs/losses/

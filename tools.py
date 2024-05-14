@@ -75,6 +75,7 @@ def draw_loss(losses_train, losses_test, figs_path, selected_emotion, subject):
     plt.legend()
     plt.tight_layout()
     plt.savefig(figs_path + 'loss_subject' + subject + '_' + selected_emotion + '.png')
+    plt.close()
 
 
 def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str):

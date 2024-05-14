@@ -34,7 +34,6 @@ sessions = [[i] for i in range(18)]
 epochs_dep_mix = 800
 epochs_dep_ind = 800
 epochs_ind = 100
-random_seed= 42
 test_split = .25
 
 best_lr = 0.001
@@ -45,7 +44,7 @@ best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
 
-selected_emotion = 'arousal'
+selected_emotion = 'valence'
 class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
 names = ['1', '2', '3', '4', '5']
 
@@ -59,7 +58,6 @@ sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
 save = False
 
-np.random.seed(random_seed)
 dep_mix = True
 dep_ind = False
 independent = True
