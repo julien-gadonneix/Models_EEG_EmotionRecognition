@@ -64,7 +64,7 @@ names = ['1', '2', '3', '4', '5']
 print('Selected emotion:', selected_emotion)
 
 n_components = 2  # pick some components for xDawnRG
-nb_classes = 5
+nb_classes = len(names)
 chans = 14
 
 cur_dir = Path(__file__).resolve().parent

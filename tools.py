@@ -57,7 +57,7 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
 
 def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, mode):
     acc = np.mean(preds == Y_test)
-    print("Subject-dependent classification accuracy on " + selected_emotion + ": %f " % (acc))
+    print("Subject-" + mode + " classification accuracy on " + selected_emotion + ": %f " % (acc))
     ConfusionMatrixDisplay(confusion_matrix(preds, Y_test), display_labels=names).plot()
     plt.title("Subject-dependent classification accuracy on " + selected_emotion, fontsize=10)
     plt.xlabel("Predicted \n Classification accuracy: %.2f " % (acc))

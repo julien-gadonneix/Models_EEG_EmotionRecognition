@@ -28,18 +28,18 @@ class DREAMERDataset(Dataset):
         eeg_sr = int(eeg_sr[0, 0])
         n_subjects = int(n_subjects[0, 0])
         n_videos = int(n_videos[0, 0])
-        n_classes = 5
+        # n_classes = 5
 
         X = []
         y = []
         if subjects is None:
-            print("Dataset with all subjects mixed...")
+            print("Dataset with all subjects mixed ...")
             for i in range(n_subjects):
                 _, _, eeg, _, val, aro, dom = data[0, i][0][0]
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
                 if sessions is None:
                     if i == 0:
-                        print("... and all sessions mixed.")
+                        print("... and all sessions/videos mixed.")
                     for j in range(n_videos):
                         stimuli_eeg_j = stimuli_eeg[j, 0]
                         baseline_eeg_j = baseline_eeg[j, 0]
@@ -96,7 +96,7 @@ class DREAMERDataset(Dataset):
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
                 if sessions is None:
                     if subject == subjects[0]:
-                        print("... and all sessions mixed.")
+                        print("... and all sessions/videos mixed.")
                     for j in range(n_videos):
                         stimuli_eeg_j = stimuli_eeg[j, 0]
                         baseline_eeg_j = baseline_eeg[j, 0]

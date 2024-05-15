@@ -11,7 +11,7 @@ from pathlib import Path
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP
 from preprocess.preprocess_SEED import SEEDDataset
-from tools import train_f, test_f, xDawnRG, subject_dependent_classification_accuracy
+from tools import train_f, test_f, xDawnRG
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -26,13 +26,23 @@ from ray.tune.schedulers import ASHAScheduler
 ###############################################################################
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-print('Using device:', device)
+is_ok = device.type != 'mps'
+if device.type != "cuda":
+      raise Exception("CUDA not available. Please select a GPU device.")
+else:
+      print('Using device:', device)
+properties = torch.cuda.get_device_properties(device)
+n_cpu = os.cpu_count()
+n_gpu = torch.cuda.device_count()
+accelerator = properties.name.split()[1]
+n_parallel = 2
 
 best_start = 1
-best_sample = 400
-subject = None
+best_sample = 200
+# subjects = [i for i in range(15)]
+subjects = None
 
-epochs = 800
+epochs = 500
 random_seed= 42
 test_split = .25
 
@@ -66,22 +76,23 @@ num_s = 1
 search_space = {
     "lr": best_lr, # tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
-    "F1": tune.grid_search([4, 8, 16, 32, 64]),
-    "D": tune.grid_search([1, 2, 4, 8, 16]),
-    "F2": tune.grid_search([4, 16, 64, 256, 1024]),
-    "kernLength": tune.grid_search([16, 32, 64, 128]),
-    "dropout": tune.grid_search([.1, .3, .5])
+    "F1": tune.grid_search([32, 64, 128]),
+    "D": tune.grid_search([4, 8, 16]),
+    "F2": tune.grid_search([32, 64, 128]),
+    "kernLength": tune.grid_search([8, 16, 32]),
+    "dropout": tune.grid_search([.1, .3])
 }
 
 def train_DREAMER(config):
 
-      info_str = 'SEED_' + f'_subject({subject})_samples({best_sample})_start({best_start})_'
+      info_str = 'SEED_' + f'_subject({subjects})_samples({best_sample})_start({best_start})_'
+      # info_str = 'DREAMER_' + selected_emotion + f'_subject({subjects})_filtered({config["lowcut"]}, {config["highcut"]}, {config["order"]})_samples({config["sample"]})_start({config["start"]})_'
 
       ###############################################################################
       # Data loading
       ###############################################################################
 
-      dataset = SEEDDataset(sets_path+info_str, subject=subject, samples=best_sample, start=best_start)
+      dataset = SEEDDataset(sets_path+info_str, subjects=subjects, samples=best_sample, start=best_start)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -92,8 +103,8 @@ def train_DREAMER(config):
       # Creating data samplers and loaders:
       train_sampler = SubsetRandomSampler(train_indices)
       test_sampler = SubsetRandomSampler(test_indices)
-      train_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=train_sampler)
-      test_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=test_sampler)
+      train_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=train_sampler, num_workers=n_gpu*n_parallel, pin_memory=True)
+      test_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=test_sampler, num_workers=n_gpu*n_parallel, pin_memory=True)
 
       print(len(train_indices), 'train samples')
       print(len(test_indices), 'test samples')
@@ -103,11 +114,14 @@ def train_DREAMER(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, 
-                  dropoutRate=config['dropout'], kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device)
+      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=config['dropout'],
+                     kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-      loss_fn = torch.nn.CrossEntropyLoss()
+      loss_fn = torch.nn.CrossEntropyLoss().cuda()
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
+      scaler = torch.cuda.amp.GradScaler()
+
+      # torch.backends.cudnn.benchmark = True
 
 
       ###############################################################################
@@ -115,8 +129,8 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, device)
-            acc = test_f(model, test_loader, device)
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
@@ -131,15 +145,18 @@ def train_DREAMER(config):
 
 ray.init(num_cpus=16, num_gpus=1)
 tuner = tune.Tuner(
-    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": 4, "GPU": .25, "accelerator_type:RTX": .25}])),
+    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
     run_config=train.RunConfig(
-          checkpoint_config=train.CheckpointConfig(num_to_keep=5)
+          checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
+          verbose=0
     ),
     tune_config=tune.TuneConfig(
           metric="mean_accuracy",
           mode="max",
           num_samples=num_s,
-          scheduler=ASHAScheduler(max_t=epochs, grace_period=10)
+          scheduler=ASHAScheduler(max_t=epochs, grace_period=10),
+          trial_name_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}",
+          trial_dirname_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}"
     ),
     param_space=search_space
 )
@@ -150,7 +167,7 @@ dfs = {result.path: result.metrics_dataframe for result in results}
 ax = None
 for d in dfs.values():
       ax = d.mean_accuracy.plot(ax=ax, legend=False)
-plt.title("Best config is: \n" + results.get_best_result().config, fontsize=10)
+plt.title("Best config is: \n" + str(results.get_best_result().config), fontsize=10)
 plt.xlabel("Epochs")
 plt.ylabel("Mean Accuracy")
 plt.savefig(figs_path + 'tune_model_results.png')
