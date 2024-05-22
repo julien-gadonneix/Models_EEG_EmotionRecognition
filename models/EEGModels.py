@@ -46,6 +46,51 @@ class EEGNet(nn.Module):
     
 
 
+class EEGNet_ChanRed(nn.Module):
+    def __init__(self, nb_classes, Chans=64, InnerChans=14, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
+                 D=2, F2=16, norm_rate=0.25, dropoutType='Dropout'):
+        super(EEGNet_ChanRed, self).__init__()
+        """ PyTorch Implementation of EEGNet """
+
+        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
+        self.norm_rate = norm_rate
+        if dropoutType == 'SpatialDropout2D':
+            self.dropoutType = nn.Dropout2d
+        elif dropoutType == 'Dropout':
+            self.dropoutType = nn.Dropout
+        else:
+            raise ValueError('dropoutType must be one of SpatialDropout2D '
+                            'or Dropout, passed as a string.')
+        
+        self.chan_reduction = nn.Conv2d(1, InnerChans, (Chans, 1), padding='valid')
+        
+        self.block1 = nn.Sequential(nn.Conv2d(1, F1, (1, kernLength), padding='same', bias=False),
+                                    nn.BatchNorm2d(F1),
+                                    ConstrainedConv2d(F1, F1*D, (InnerChans, 1), bias=False, groups=F1, padding='valid', nr=1.),
+                                    nn.BatchNorm2d(D*F1),
+                                    nn.ELU(),
+                                    nn.AvgPool2d((1, 4)),
+                                    self.dropoutType(dropoutRate))
+        self.block2 = nn.Sequential(SeparableConv2d(F1*D, F2, (1, 16), padding='same', bias=False),
+                                    nn.BatchNorm2d(F2),
+                                    nn.ELU(),
+                                    nn.AvgPool2d((1, 8)),
+                                    self.dropoutType(dropoutRate))
+        self.flatten = nn.Flatten()
+        self.dense = ConstrainedLinear(F2*int((Samples/4)/8), nb_classes)
+    
+
+    def forward(self, x):
+        x = self.chan_reduction(x)
+        x = torch.permute(x, (0, 2, 1, 3))
+        x = self.block1(x)
+        x = self.block2(x)
+        x = self.flatten(x)
+        x = self.dense(x, self.norm_rate)
+        return F.softmax(x, dim=1)
+
+
+
 class EEGNet_SSVEP(nn.Module):
     def __init__(self, nb_classes, Chans=64, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
                  D=2, F2=16, norm_rate=0.25, dropoutType='Dropout'):

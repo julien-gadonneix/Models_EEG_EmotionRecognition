@@ -165,7 +165,6 @@ class SEEDDataset(Dataset):
                                     # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                                     y.append(labels[video]+1)
         X = torch.stack(X)
-        torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
         # self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
         self.targets = torch.tensor(y, dtype=torch.long)

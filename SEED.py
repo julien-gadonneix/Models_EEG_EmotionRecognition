@@ -9,7 +9,7 @@ import os
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP
+from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed
 from preprocess.preprocess_SEED import SEEDDataset
 from tools import train_f, test_f, xDawnRG
 
@@ -59,6 +59,7 @@ names = ['Negative', 'Neutral', 'Positive']
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 62
+DREAMER_chans = 14
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
@@ -76,10 +77,10 @@ num_s = 1
 search_space = {
     "lr": best_lr, # tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
-    "F1": tune.grid_search([32, 64, 128]),
-    "D": tune.grid_search([4, 8, 16]),
-    "F2": tune.grid_search([32, 64, 128]),
-    "kernLength": tune.grid_search([8, 16, 32]),
+    "F1": tune.grid_search([16, 32, 64, 128]),
+    "D": tune.grid_search([2, 4, 8, 16]),
+    "F2": tune.grid_search([16, 32, 64, 128]),
+    "kernLength": tune.grid_search([8, 16, 32, 64]),
     "dropout": tune.grid_search([.1, .3])
 }
 
@@ -114,7 +115,7 @@ def train_DREAMER(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=config['dropout'],
+      model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=DREAMER_chans, Samples=best_sample, dropoutRate=config['dropout'],
                      kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
       loss_fn = torch.nn.CrossEntropyLoss().cuda()

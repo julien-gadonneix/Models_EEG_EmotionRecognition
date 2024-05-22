@@ -147,7 +147,6 @@ class DREAMERDataset(Dataset):
                             else:
                                 raise ValueError('Invalid emotion')
         X = torch.stack(X)
-        torch.permute(X, (0, 2, 1))
         self.data = X.unsqueeze(1)
         # self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
         self.targets = torch.tensor(y, dtype=torch.long)
