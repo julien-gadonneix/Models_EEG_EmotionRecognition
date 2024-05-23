@@ -40,7 +40,7 @@ best_kernLength = 16 # maybe go back to 64 because now f_min = 4Hz
 best_dropout = .1
 
 names = ['Negative', 'Neutral', 'Positive']
-selected_emotion = 'happiness'
+selected_emotion = 'happiness(SEED)'
 
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
