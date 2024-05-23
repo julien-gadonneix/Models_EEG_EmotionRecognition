@@ -35,7 +35,7 @@ properties = torch.cuda.get_device_properties(device)
 n_cpu = os.cpu_count()
 n_gpu = torch.cuda.device_count()
 accelerator = properties.name.split()[1]
-n_parallel = 4
+n_parallel = 2
 
 best_highcut = None
 best_lowcut = .5
@@ -63,7 +63,6 @@ class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
 names = ['1', '2', '3', '4', '5']
 print('Selected emotion:', selected_emotion)
 
-n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 14
 
@@ -86,15 +85,15 @@ search_space = {
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
     "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
     "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
-    "order": best_order, # tune.grid_search([3, 5]),
+    "order": tune.grid_search([3, 5]),
     "lowcut": best_lowcut, # tune.grid_search([.5, .3]),
-    "highcut": best_highcut, # tune.grid_search([None, 60, 63]),
+    "highcut": tune.grid_search([None, 50, 55, 45]),
     "F1": best_F1, # tune.grid_search([16, 32, 64, 128, 256]),
     "D": best_D, # tune.grid_search([2, 4, 8, 16, 32]),
     "F2": best_F2, # tune.grid_search([4, 16, 64, 128, 256]),
     "kernLength": best_kernLength, # tune.grid_search([8, 16, 32, 64]),
     "dropout": best_dropout, # tune.grid_search([.1, .3]),
-    "type": best_type # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
+    "type": tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
 }
 
 def train_DREAMER(config):
@@ -190,11 +189,5 @@ best_result = results.get_best_result("mean_accuracy", mode="max")
 with best_result.checkpoint.as_directory() as checkpoint_dir:
     state_dict = torch.load(os.path.join(checkpoint_dir, "model.pth"))
     torch.save(state_dict, models_path + "best_model.pth")
-
-###############################################################################
-# Statistical benchmark analysis
-###############################################################################
-
-# xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str)
 
 

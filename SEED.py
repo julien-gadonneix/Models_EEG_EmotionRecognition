@@ -41,6 +41,7 @@ best_start = 1
 best_sample = 200
 # subjects = [i for i in range(15)]
 subjects = None
+sessions = None
 
 epochs = 500
 random_seed= 42
@@ -56,7 +57,6 @@ best_dropout = .1
 
 names = ['Negative', 'Neutral', 'Positive']
 
-n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 62
 DREAMER_chans = 14
@@ -65,6 +65,7 @@ cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
 sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
+save = False
 
 np.random.seed(random_seed)
 num_s = 1
@@ -84,7 +85,7 @@ search_space = {
     "dropout": tune.grid_search([.1, .3])
 }
 
-def train_DREAMER(config):
+def train_SEED(config):
 
       info_str = 'SEED_' + f'_subject({subjects})_samples({best_sample})_start({best_start})_'
       # info_str = 'DREAMER_' + selected_emotion + f'_subject({subjects})_filtered({config["lowcut"]}, {config["highcut"]}, {config["order"]})_samples({config["sample"]})_start({config["start"]})_'
@@ -93,7 +94,7 @@ def train_DREAMER(config):
       # Data loading
       ###############################################################################
 
-      dataset = SEEDDataset(sets_path+info_str, subjects=subjects, samples=best_sample, start=best_start)
+      dataset = SEEDDataset(sets_path+info_str, subjects=subjects, sessions=sessions, samples=best_sample, start=best_start, save=False)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -146,7 +147,7 @@ def train_DREAMER(config):
 
 ray.init(num_cpus=16, num_gpus=1)
 tuner = tune.Tuner(
-    tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
+    tune.with_resources(train_SEED, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
     run_config=train.RunConfig(
           checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
           verbose=0
@@ -177,11 +178,5 @@ best_result = results.get_best_result("mean_accuracy", mode="max")
 with best_result.checkpoint.as_directory() as checkpoint_dir:
     state_dict = torch.load(os.path.join(checkpoint_dir, "model.pth"))
     torch.save(state_dict, models_path + "best_model.pth")
-
-###############################################################################
-# Statistical benchmark analysis
-###############################################################################
-
-# xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str)
 
 

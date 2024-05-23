@@ -191,7 +191,7 @@ if dep_ind:
             model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-            loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
+            loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
             scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
@@ -273,7 +273,7 @@ if independent:
         model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                        kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
+        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
         scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
