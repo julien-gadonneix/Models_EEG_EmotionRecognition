@@ -28,7 +28,6 @@ class DREAMERDataset(Dataset):
         eeg_sr = int(eeg_sr[0, 0])
         n_subjects = int(n_subjects[0, 0])
         n_videos = int(n_videos[0, 0])
-        # n_classes = 5
 
         X = []
         y = []
@@ -148,9 +147,8 @@ class DREAMERDataset(Dataset):
                                 raise ValueError('Invalid emotion')
         X = torch.stack(X)
         self.data = X.unsqueeze(1)
-        # self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
         self.targets = torch.tensor(y, dtype=torch.long)
-        # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0))
+        # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0)) TODO: Implement class weights
         if save:
             self._save(path)
 
