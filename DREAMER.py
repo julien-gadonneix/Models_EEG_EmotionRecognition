@@ -58,9 +58,14 @@ best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
 
+group_classes = False
+if group_classes:
+      class_weights = torch.tensor([1., 1.]).to(device)
+      names = ['Low', 'High']
+else:
+      class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
+      names = ['1', '2', '3', '4', '5']
 selected_emotion = 'valence'
-class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
-names = ['1', '2', '3', '4', '5']
 print('Selected emotion:', selected_emotion)
 
 nb_classes = len(names)
@@ -85,15 +90,15 @@ search_space = {
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
     "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
     "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
-    "order": tune.grid_search([3, 5]),
+    "order": best_order, # tune.grid_search([3, 5]),
     "lowcut": best_lowcut, # tune.grid_search([.5, .3]),
-    "highcut": tune.grid_search([None, 50, 55, 45]),
+    "highcut": best_highcut, # tune.grid_search([None, 50, 55, 45]),
     "F1": best_F1, # tune.grid_search([16, 32, 64, 128, 256]),
     "D": best_D, # tune.grid_search([2, 4, 8, 16, 32]),
     "F2": best_F2, # tune.grid_search([4, 16, 64, 128, 256]),
     "kernLength": best_kernLength, # tune.grid_search([8, 16, 32, 64]),
     "dropout": best_dropout, # tune.grid_search([.1, .3]),
-    "type": tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
+    "type": best_type, # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
 }
 
 def train_DREAMER(config):
@@ -105,7 +110,7 @@ def train_DREAMER(config):
       ###############################################################################
 
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, samples=config["sample"], start=config["start"],
-                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save)
+                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save, group_classes=group_classes)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))

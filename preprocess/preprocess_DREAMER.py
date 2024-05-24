@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class DREAMERDataset(Dataset):
-    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, type="butter", save=False):
+    def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, type="butter", save=False, group_classes=True):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -17,10 +17,10 @@ class DREAMERDataset(Dataset):
             # self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
-            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, type, save)
+            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, type, save, group_classes)
 
 
-    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, type="butter", save=False):
+    def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=0.3, highcut=None, order=3, type="butter", save=False, group_classes=True):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
@@ -35,6 +35,23 @@ class DREAMERDataset(Dataset):
             print("Dataset with all subjects mixed ...")
             for i in range(n_subjects):
                 _, _, eeg, _, val, aro, dom = data[0, i][0][0]
+                if emotion == 'valence':
+                    if group_classes:
+                        labels = (val > 3) * 1
+                    else:
+                        labels = val
+                elif emotion == 'arousal':
+                    if group_classes:
+                        labels = (aro > 3) * 1
+                    else:
+                        labels = aro
+                elif emotion == 'dominance':
+                    if group_classes:
+                        labels = (dom > 3) * 1
+                    else:
+                        labels = dom
+                else:
+                    raise ValueError('Invalid emotion')
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
                 if sessions is None:
                     if i == 0:
@@ -54,14 +71,7 @@ class DREAMERDataset(Dataset):
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
                             X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
                             # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
-                            if emotion == 'valence':
-                                y.append(val[j, 0]-1)
-                            elif emotion == 'arousal':
-                                y.append(aro[j, 0]-1)
-                            elif emotion == 'dominance':
-                                y.append(dom[j, 0]-1)
-                            else:
-                                raise ValueError('Invalid emotion')
+                            y.append(labels[j, 0])
                 else:
                     if i == 0:
                         print("... and session(s):", sessions)
@@ -80,18 +90,28 @@ class DREAMERDataset(Dataset):
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
                             X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
                             # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
-                            if emotion == 'valence':
-                                y.append(val[sess, 0]-1)
-                            elif emotion == 'arousal':
-                                y.append(aro[sess, 0]-1)
-                            elif emotion == 'dominance':
-                                y.append(dom[sess, 0]-1)
-                            else:
-                                raise ValueError('Invalid emotion')
+                            y.append(labels[sess, 0])
         else:
             print("Dataset with subjects:", subjects, "...")
             for subject in subjects:
                 _, _, eeg, _, val, aro, dom = data[0, subject][0][0]
+                if emotion == 'valence':
+                    if group_classes:
+                        labels = (val > 3) * 1
+                    else:
+                        labels = val
+                elif emotion == 'arousal':
+                    if group_classes:
+                        labels = (aro > 3) * 1
+                    else:
+                        labels = aro
+                elif emotion == 'dominance':
+                    if group_classes:
+                        labels = (dom > 3) * 1
+                    else:
+                        labels = dom
+                else:
+                    raise ValueError('Invalid emotion')
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
                 if sessions is None:
                     if subject == subjects[0]:
@@ -111,14 +131,7 @@ class DREAMERDataset(Dataset):
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
                             X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
                             # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
-                            if emotion == 'valence':
-                                y.append(val[j, 0]-1)
-                            elif emotion == 'arousal':
-                                y.append(aro[j, 0]-1)
-                            elif emotion == 'dominance':
-                                y.append(dom[j, 0]-1)
-                            else:
-                                raise ValueError('Invalid emotion')
+                            y.append(labels[j, 0])
                 else:
                     if subject == subjects[0]:
                         print("... and session(s):", sessions)
@@ -137,14 +150,7 @@ class DREAMERDataset(Dataset):
                         for k in range((stimuli_eeg_j.shape[0]//samples)-start):
                             X.append(torch.tensor(stimuli_eeg_j[l-((k+1)*samples):l-(k*samples), :].T, dtype=torch.float32))
                             # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
-                            if emotion == 'valence':
-                                y.append(val[sess, 0]-1)
-                            elif emotion == 'arousal':
-                                y.append(aro[sess, 0]-1)
-                            elif emotion == 'dominance':
-                                y.append(dom[sess, 0]-1)
-                            else:
-                                raise ValueError('Invalid emotion')
+                            y.append(labels[sess, 0])
         X = torch.stack(X)
         self.data = X.unsqueeze(1)
         self.targets = torch.tensor(y, dtype=torch.long)

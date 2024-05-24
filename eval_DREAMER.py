@@ -43,12 +43,17 @@ best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
 
+group_classes = True
+if group_classes:
+      class_weights = torch.tensor([1., 1.]).to(device)
+      names = ['Low', 'High']
+else:
+      class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
+      names = ['1', '2', '3', '4', '5']
 selected_emotion = 'valence'
-class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
-names = ['1', '2', '3', '4', '5']
 
 n_components = 2  # pick some components for xDawnRG
-nb_classes = 5
+nb_classes = len(names)
 chans = 14
 
 cur_dir = Path(__file__).resolve().parent
@@ -58,7 +63,7 @@ models_path = str(cur_dir) + '/tmp/'
 save = False
 
 dep_mix = True
-dep_ind = False
+dep_ind = True
 independent = True
 
 
@@ -79,7 +84,7 @@ if dep_mix:
         ###############################################################################
 
         dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))
@@ -163,9 +168,9 @@ if dep_ind:
             info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sess_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
             sess_test = sess
             dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
-                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
             dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
-                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
             dataset_train_size = len(dataset_train)
             dataset_test_size = len(dataset_test)
 
@@ -245,9 +250,9 @@ if independent:
         info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subjects_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
         subjects_test = subject
         dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subjects_train, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
         dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subjects_test, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
         dataset_train_size = len(dataset_train)
         dataset_test_size = len(dataset_test)
 
