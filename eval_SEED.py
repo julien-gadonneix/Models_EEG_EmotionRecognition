@@ -36,7 +36,7 @@ best_batch_size = 128
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLength = 16 # maybe go back to 64 because now f_min = 4Hz
+best_kernLength = 25 # maybe go back to 100 because now f_min = 4Hz
 best_dropout = .1
 
 names = ['Negative', 'Neutral', 'Positive']

@@ -23,12 +23,11 @@ class SEEDDataset(Dataset):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/SEED/'
 
-        n_videos = 15 # TODO: read this
-        # n_classes = 3
-
-        files_mat = [f for f in os.listdir(data_path) if f.endswith('.mat') and f != 'label.mat']
+        files_mat = sorted([f for f in os.listdir(data_path) if f.endswith('.mat') and f != 'label.mat'])
         labels_mat = scipy.io.loadmat(data_path + 'label.mat')
         labels = labels_mat['label'][0]
+
+        n_videos = len(labels)
 
         X = []
         y = []
@@ -39,7 +38,8 @@ class SEEDDataset(Dataset):
                 for file in files_mat:
                     mat = scipy.io.loadmat(data_path + file)
                     if videos is None:
-                        print("... and all videos mixed.")
+                        if file == files_mat[0]:
+                            print("... and all videos mixed.")
                         for j in range(n_videos):
                             key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                             stimuli_eeg_j = mat[key].T
@@ -51,7 +51,8 @@ class SEEDDataset(Dataset):
                                 # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                                 y.append(labels[j]+1)
                     else:
-                        print("... and videos:", videos)
+                        if file == files_mat[0]:
+                            print("... and videos:", videos)
                         for video in videos:
                             key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                             stimuli_eeg_j = mat[key].T
@@ -68,13 +69,16 @@ class SEEDDataset(Dataset):
                 filtered_files_mat = []
                 for file in files_mat:
                     number = int(file.split('_')[0])
+                    if number not in count_map:
+                        count_map[number] = 0
                     if count_map[number] in sessions:
                         filtered_files_mat.append(file)
                     count_map[number] += 1
                 for file in filtered_files_mat:
                     mat = scipy.io.loadmat(data_path + file)
                     if videos is None:
-                        print("... and all videos mixed.")
+                        if file == filtered_files_mat[0]:
+                            print("... and all videos mixed.")
                         for j in range(n_videos):
                             key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                             stimuli_eeg_j = mat[key].T
@@ -86,7 +90,8 @@ class SEEDDataset(Dataset):
                                 # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                                 y.append(labels[j]+1)
                     else:
-                        print("... and videos:", videos)
+                        if file == filtered_files_mat[0]:
+                            print("... and videos:", videos)
                         for video in videos:
                             key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                             stimuli_eeg_j = mat[key].T
@@ -102,11 +107,13 @@ class SEEDDataset(Dataset):
             for subject in subjects:
                 filtered_files_mat = [f for f in files_mat if f.startswith(f'{subject+1}_')]
                 if sessions is None:
-                    print("... , all sessions mixed ...")
+                    if subject == subjects[0]:
+                        print("... , all sessions mixed ...")
                     for file in filtered_files_mat:
                         mat = scipy.io.loadmat(data_path + file)
                         if videos is None:
-                            print("... and all videos mixed.")
+                            if subject == subjects[0] and file == filtered_files_mat[0]:
+                                print("... and all videos mixed.")
                             for j in range(n_videos):
                                 key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                                 stimuli_eeg_j = mat[key].T
@@ -118,7 +125,8 @@ class SEEDDataset(Dataset):
                                     # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                                     y.append(labels[j]+1)
                         else:
-                            print("... and videos:", videos)
+                            if subject == subjects[0] and file == filtered_files_mat[0]:
+                                print("... and videos:", videos)
                             for video in videos:
                                 key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                                 stimuli_eeg_j = mat[key].T
@@ -130,18 +138,22 @@ class SEEDDataset(Dataset):
                                     # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                                     y.append(labels[video]+1)
                 else:
-                    print("... , sessions:", sessions, "...")
+                    if subject == subjects[0]:
+                        print("... , sessions:", sessions, "...")
                     count_map = defaultdict(int)
                     filtered_filtered_files_mat = []
                     for file in filtered_files_mat:
                         number = int(file.split('_')[0])
+                        if number not in count_map:
+                            count_map[number] = 0
                         if count_map[number] in sessions:
                             filtered_filtered_files_mat.append(file)
                         count_map[number] += 1
                     for file in filtered_filtered_files_mat:
                         mat = scipy.io.loadmat(data_path + file)
                         if videos is None:
-                            print("... and all videos mixed.")
+                            if subject == subjects[0] and file == filtered_filtered_files_mat[0]:
+                                print("... and all videos mixed.")
                             for j in range(n_videos):
                                 key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                                 stimuli_eeg_j = mat[key].T
@@ -153,7 +165,8 @@ class SEEDDataset(Dataset):
                                     # X.append(torch.tensor(stimuli_eeg_j[k*samples:(k+1)*samples, :].T, dtype=torch.float32))
                                     y.append(labels[j]+1)
                         else:
-                            print("... and videos:", videos)
+                            if subject == subjects[0] and file == filtered_filtered_files_mat[0]:
+                                print("... and videos:", videos)
                             for video in videos:
                                 key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                                 stimuli_eeg_j = mat[key].T
@@ -166,7 +179,6 @@ class SEEDDataset(Dataset):
                                     y.append(labels[video]+1)
         X = torch.stack(X)
         self.data = X.unsqueeze(1)
-        # self.targets = torch.nn.functional.one_hot(torch.LongTensor(y), num_classes=n_classes).float()
         self.targets = torch.tensor(y, dtype=torch.long)
         if save:
             self._save(path)
