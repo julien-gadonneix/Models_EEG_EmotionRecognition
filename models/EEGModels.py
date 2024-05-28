@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.utils import *
+from torch.autograd import Variable
 
 
 
@@ -87,6 +88,107 @@ class EEGNet_ChanRed(nn.Module):
         x = self.block2(x)
         x = self.flatten(x)
         x = self.dense(x, self.norm_rate)
+        return F.softmax(x, dim=1)
+
+
+
+# need these for CapsEEGNet
+class PrimaryCaps(nn.Module):
+    def __init__(self, num_capsules=8, in_channels=16, out_channels=32, kernel_size=9, num_routes=32*1*96):
+        super(PrimaryCaps, self).__init__()
+        self.num_routes = num_routes
+        self.capsules = nn.ModuleList([
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(1, kernel_size), stride=2, padding=0)
+            for _ in range(num_capsules)])
+
+    def forward(self, x):
+        u = [capsule(x) for capsule in self.capsules]
+        u = torch.stack(u, dim=1)
+        u = u.view(x.size(0), self.num_routes, -1)
+        return u # self.squash(u)
+
+    # def squash(self, input_tensor):
+    #     squared_norm = (input_tensor ** 2).sum(-1, keepdim=True)
+    #     output_tensor = squared_norm * input_tensor / ((1. + squared_norm) * torch.sqrt(squared_norm))
+    #     return output_tensor
+
+class EmotionCaps(nn.Module):
+    def __init__(self, num_capsules=3, num_routes=32*6*6, in_channels=8, out_channels=16):
+        super(EmotionCaps, self).__init__()
+        self.in_channels = in_channels
+        self.num_routes = num_routes
+        self.num_capsules = num_capsules
+        self.W = nn.Parameter(torch.randn(1, num_routes, num_capsules, out_channels, in_channels))
+
+    def forward(self, x):
+        batch_size = x.size(0)
+        x = torch.stack([x] * self.num_capsules, dim=2).unsqueeze(4)
+        W = torch.cat([self.W] * batch_size, dim=0)
+        u_hat = torch.matmul(W, x)
+        b_ij = Variable(torch.zeros(1, self.num_routes, self.num_capsules, 1))
+        b_ij = b_ij.to(x.device)
+        num_iterations = 3
+        for iteration in range(num_iterations):
+            c_ij = F.softmax(b_ij, dim=1)
+            c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)
+            s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
+            v_j = self.squash(s_j)
+            if iteration < num_iterations - 1:
+                a_ij = torch.matmul(u_hat.transpose(3, 4), torch.cat([v_j] * self.num_routes, dim=1))
+                b_ij = b_ij + a_ij.squeeze(4).mean(dim=0, keepdim=True)
+        return v_j.squeeze(1)
+
+    def squash(self, input_tensor):
+        squared_norm = (input_tensor ** 2).sum(-1, keepdim=True)
+        output_tensor = squared_norm * input_tensor / ((1. + squared_norm) * torch.sqrt(squared_norm))
+        return output_tensor
+    
+
+
+class CapsEEGNet(nn.Module):
+    def __init__(self, nb_classes, Chans=62, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
+                 D=2, F2=32, norm_rate=0.25, dropoutType='Dropout',
+                 num_capsules=8, num_routes=32*1*96, kern_size=9, out_dim=16):
+        super(CapsEEGNet, self).__init__()
+        """ PyTorch Implementation of EEGNet """
+
+        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
+        self.norm_rate = norm_rate
+        if dropoutType == 'SpatialDropout2D':
+            self.dropoutType = nn.Dropout2d
+        elif dropoutType == 'Dropout':
+            self.dropoutType = nn.Dropout
+        else:
+            raise ValueError('dropoutType must be one of SpatialDropout2D '
+                            'or Dropout, passed as a string.')
+        
+        self.block_1_2 = nn.Sequential(nn.Conv2d(1, F1, (1, kernLength), padding='same', bias=False),
+                                    nn.BatchNorm2d(F1),
+                                    nn.ELU(), # added
+                                    ConstrainedConv2d(F1, F1*D, (Chans, 1), bias=False, groups=F1, padding='valid', nr=1.),
+                                    nn.BatchNorm2d(D*F1),
+                                    nn.ELU(),
+                                    # nn.AvgPool2d((1, 4)),
+                                    self.dropoutType(dropoutRate))
+        # self.block2 = nn.Sequential(SeparableConv2d(F1*D, F2, (1, 16), padding='same', bias=False),
+        #                             nn.BatchNorm2d(F2),
+        #                             nn.ELU(),
+        #                             nn.AvgPool2d((1, 8)),
+        #                             self.dropoutType(dropoutRate))
+        # self.flatten = nn.Flatten()
+        # self.dense = ConstrainedLinear(F2*int((Samples/4)/8), nb_classes)
+
+        self.primaryCaps = PrimaryCaps(num_capsules=num_capsules, in_channels=F1*D, out_channels=F2, kernel_size=kern_size, num_routes=num_routes)
+        self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=num_routes, in_channels=num_capsules, out_channels=out_dim)
+    
+
+    def forward(self, x):
+        x = self.block_1_2(x)
+        # x = self.block2(x)
+        # x = self.flatten(x)
+        # x = self.dense(x, self.norm_rate)
+        x = self.primaryCaps(x)
+        x = self.emotionCaps(x)
         return F.softmax(x, dim=1)
 
 

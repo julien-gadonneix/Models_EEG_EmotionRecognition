@@ -26,7 +26,7 @@ best_sample = 200
 subjects = [[i] for i in range(15)]
 sessions = None
 
-epochs_dep = 300
+epochs_dep = 150
 epochs_ind = 100
 random_seed= 42
 test_split = .33
@@ -54,8 +54,8 @@ models_path = str(cur_dir) + '/tmp/'
 save = False
 
 np.random.seed(random_seed)
-dependent = True
-independent = False
+dependent = False
+independent = True
 
 
 ###############################################################################
@@ -116,7 +116,7 @@ if dependent:
             losses_train.append(loss)
             acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
             losses_test.append(loss_test)
-            if epoch % 100 == 0:
+            if epoch % 10 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
         draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
@@ -156,7 +156,7 @@ if independent:
         subjects_train = [i for i in range(23) if i != subject[0]]
         info_str_train = 'SEED_' + selected_emotion + f'_subject({subjects_train})_samples({best_sample})_start({best_start})_'
         subjects_test = subject
-        dataset_train = SEEDDataset(sets_path+info_str_train, subjects=subjects_train, sessons=sessions, samples=best_sample, start=best_start, save=save)
+        dataset_train = SEEDDataset(sets_path+info_str_train, subjects=subjects_train, sessions=sessions, samples=best_sample, start=best_start, save=save)
         dataset_test = SEEDDataset(sets_path+info_str_test, subjects=subjects_test, sessions=sessions, samples=best_sample, start=best_start, save=save)
         dataset_train_size = len(dataset_train)
         dataset_test_size = len(dataset_test)
