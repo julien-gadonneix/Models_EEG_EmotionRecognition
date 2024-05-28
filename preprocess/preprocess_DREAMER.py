@@ -14,7 +14,7 @@ class DREAMERDataset(Dataset):
             print("Loading dataset from file.")
             self.data = torch.load(data_path)
             self.targets = torch.load(path + 'targets.pt')
-            # self.class_weights = torch.load(path + 'class_weights.pt')
+            self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
             self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, type, save, group_classes)
@@ -39,17 +39,17 @@ class DREAMERDataset(Dataset):
                     if group_classes:
                         labels = (val > 3) * 1
                     else:
-                        labels = val
+                        labels = val - 1
                 elif emotion == 'arousal':
                     if group_classes:
                         labels = (aro > 3) * 1
                     else:
-                        labels = aro
+                        labels = aro - 1
                 elif emotion == 'dominance':
                     if group_classes:
                         labels = (dom > 3) * 1
                     else:
-                        labels = dom
+                        labels = dom - 1
                 else:
                     raise ValueError('Invalid emotion')
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
@@ -99,17 +99,17 @@ class DREAMERDataset(Dataset):
                     if group_classes:
                         labels = (val > 3) * 1
                     else:
-                        labels = val
+                        labels = val - 1
                 elif emotion == 'arousal':
                     if group_classes:
                         labels = (aro > 3) * 1
                     else:
-                        labels = aro
+                        labels = aro - 1
                 elif emotion == 'dominance':
                     if group_classes:
                         labels = (dom > 3) * 1
                     else:
-                        labels = dom
+                        labels = dom - 1
                 else:
                     raise ValueError('Invalid emotion')
                 baseline_eeg, stimuli_eeg = eeg[0, 0]
@@ -154,7 +154,8 @@ class DREAMERDataset(Dataset):
         X = torch.stack(X)
         self.data = X.unsqueeze(1)
         self.targets = torch.tensor(y, dtype=torch.long)
-        # self.class_weights = torch.tensor(1. / self.targets.mean(dim=0)) TODO: Implement class weights
+        _, counts = torch.unique(self.targets, return_counts=True)
+        self.class_weights = counts.float() / counts.sum()
         if save:
             self._save(path)
 
@@ -167,4 +168,4 @@ class DREAMERDataset(Dataset):
     def _save(self, path):
         torch.save(self.data, path + 'data.pt')
         torch.save(self.targets, path + 'targets.pt')
-        # torch.save(self.class_weights, path + 'class_weights.pt')
+        torch.save(self.class_weights, path + 'class_weights.pt')

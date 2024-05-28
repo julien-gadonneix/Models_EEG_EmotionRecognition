@@ -50,7 +50,7 @@ if group_classes:
 else:
       class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
       names = ['1', '2', '3', '4', '5']
-selected_emotion = 'valence'
+selected_emotion = 'dominance'
 
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
@@ -63,8 +63,8 @@ models_path = str(cur_dir) + '/tmp/'
 save = False
 
 dep_mix = True
-dep_ind = True
-independent = True
+dep_ind = False
+independent = False
 
 
 ###############################################################################
@@ -108,7 +108,7 @@ if dep_mix:
         model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                        kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+        loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights.to(device)).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
         scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
