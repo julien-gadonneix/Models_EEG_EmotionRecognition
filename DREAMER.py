@@ -47,7 +47,6 @@ best_sample = 128
 subjects = None
 
 epochs = 500
-random_seed= 42
 test_split = .25
 
 best_lr = 0.001
@@ -77,6 +76,7 @@ sets_path = str(cur_dir) + '/sets/'
 models_path = str(cur_dir) + '/tmp/'
 save = False
 
+random_seed= 42
 np.random.seed(random_seed)
 num_s = 1
 

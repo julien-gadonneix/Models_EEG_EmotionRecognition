@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP
+from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss
 
@@ -50,7 +50,7 @@ if group_classes:
 else:
       class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
       names = ['1', '2', '3', '4', '5']
-selected_emotion = 'dominance'
+selected_emotion = 'arousal'
 
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
@@ -105,10 +105,11 @@ if dep_mix:
         # Model configurations
         ###############################################################################
 
-        model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+        model = CapsEEGNet(nb_classes=nb_classes).to(device=device, memory_format=torch.channels_last)
+        # model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
+        #                kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights.to(device)).to(device)
+        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
         scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 

@@ -154,8 +154,14 @@ class DREAMERDataset(Dataset):
         X = torch.stack(X)
         self.data = X.unsqueeze(1)
         self.targets = torch.tensor(y, dtype=torch.long)
-        _, counts = torch.unique(self.targets, return_counts=True)
-        self.class_weights = counts.float() / counts.sum()
+        nb_classes = 2 if group_classes else 5
+        all_classes = torch.arange(nb_classes)
+        unique_classes, counts = torch.unique(self.targets, return_counts=True)
+        all_counts = torch.zeros_like(all_classes, dtype=torch.float)
+        for i, cls in enumerate(all_classes):
+            if cls in unique_classes:
+                all_counts[i] = counts[unique_classes == cls].item()
+        self.class_weights = all_counts.float() / counts.sum()
         if save:
             self._save(path)
 
