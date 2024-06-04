@@ -30,27 +30,29 @@ best_sample = 128
 subjects = [[i] for i in range(23)]
 sessions = [[i] for i in range(18)]
 
-epochs_dep_mix = 800
+epochs_dep_mix = 800 # 300
 epochs_dep_ind = 800
-epochs_ind = 100
+epochs_ind = 20
 test_split = .25
 
-best_lr = 0.001
-best_batch_size = 128
+best_lr = 0.001 # 0.01
+best_batch_size = 128 # 16
 best_F1 = 64
 best_D = 8
 best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
 
-group_classes = True
-if group_classes:
+
+best_group_classes = True
+best_adapt_classWeights = True
+if best_group_classes:
       class_weights = torch.tensor([1., 1.]).to(device)
       names = ['Low', 'High']
 else:
       class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
       names = ['1', '2', '3', '4', '5']
-selected_emotion = 'arousal'
+selected_emotion = 'valence'
 
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
@@ -84,7 +86,7 @@ if dep_mix:
         ###############################################################################
 
         dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes)
         dataset_size = len(dataset)
 
         indices = list(range(dataset_size))
@@ -105,11 +107,11 @@ if dep_mix:
         # Model configurations
         ###############################################################################
 
-        model = CapsEEGNet(nb_classes=nb_classes).to(device=device, memory_format=torch.channels_last)
-        # model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-        #                kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+        # model = CapsEEGNet(nb_classes=nb_classes).to(device=device)
+        model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
+                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+        loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
         scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
@@ -134,6 +136,7 @@ if dep_mix:
         with torch.no_grad():
             for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
                 X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
+                # X_batch = X_batch.to(device=device)
                 if is_ok:
                     with torch.autocast(device_type=device.type, dtype=torch.float16):
                         y_pred = model(X_batch)
@@ -169,9 +172,9 @@ if dep_ind:
             info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sess_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
             sess_test = sess
             dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
-                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes)
             dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
-                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
+                                    lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes)
             dataset_train_size = len(dataset_train)
             dataset_test_size = len(dataset_test)
 
@@ -197,7 +200,7 @@ if dep_ind:
             model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-            loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+            loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
             scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
@@ -251,9 +254,9 @@ if independent:
         info_str_train = 'DREAMER_' + selected_emotion + f'_subject({subjects_train})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
         subjects_test = subject
         dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subjects_train, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes)
         dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subjects_test, samples=best_sample, start=best_start,
-                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=group_classes)
+                                lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes)
         dataset_train_size = len(dataset_train)
         dataset_test_size = len(dataset_test)
 
@@ -279,7 +282,7 @@ if independent:
         model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                        kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+        loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
         scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 

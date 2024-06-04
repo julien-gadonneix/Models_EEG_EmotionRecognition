@@ -9,8 +9,12 @@ class ConstrainedConv2d(nn.Conv2d):
         self.nr = nr
 
     def forward(self, input):
-        return F.conv2d(input, self.weight.clamp(min=-self.nr, max=self.nr), self.bias, self.stride,
+        if self.nr is None:
+            return F.conv2d(input, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
+        else:
+            return F.conv2d(input, self.weight.clamp(min=-self.nr, max=self.nr), self.bias, self.stride,
+                            self.padding, self.dilation, self.groups)
     
 
 class SeparableConv2d(nn.Module):
@@ -28,5 +32,12 @@ class SeparableConv2d(nn.Module):
     
 
 class ConstrainedLinear(nn.Linear):
-    def forward(self, input, norm_rate):
-        return F.linear(input, self.weight.clamp(min=-norm_rate, max=norm_rate), self.bias)
+    def __init__(self, in_features, out_features, bias=True, norm_rate=.25):
+        super(ConstrainedLinear, self).__init__(in_features, out_features, bias)
+        self.norm_rate = norm_rate
+
+    def forward(self, input):
+        if self.norm_rate is None:
+            return F.linear(input, self.weight, self.bias)
+        else:
+            return F.linear(input, self.weight.clamp(min=-self.norm_rate, max=self.norm_rate), self.bias)

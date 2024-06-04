@@ -13,8 +13,9 @@ from sklearn.metrics import confusion_matrix
 def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
     model.train()
     avg_loss = 0
-    for batch_index, (X_batch, Y_batch) in enumerate(train_loader):
+    for X_batch, Y_batch in train_loader:
         X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
+        # X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
         optimizer.zero_grad(set_to_none=True)
         if is_ok:
             with torch.autocast(device_type=device.type, dtype=torch.float16):
@@ -37,10 +38,11 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
     total = 0
     avg_loss = 0
     with torch.no_grad():
-        for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+        for X_batch, Y_batch in test_loader:
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
+            # X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
             if is_ok:
-                with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=is_ok):
+                with torch.autocast(device_type=device.type, dtype=torch.float16):
                     y_pred = model(X_batch)
                     loss = loss_fn(y_pred, Y_batch)
             else:

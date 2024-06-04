@@ -57,17 +57,11 @@ best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
 
-group_classes = False
-if group_classes:
-      class_weights = torch.tensor([1., 1.]).to(device)
-      names = ['Low', 'High']
-else:
-      class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
-      names = ['1', '2', '3', '4', '5']
+best_group_classes = True
+best_adapt_classWeights = True
 selected_emotion = 'valence'
 print('Selected emotion:', selected_emotion)
 
-nb_classes = len(names)
 chans = 14
 
 cur_dir = Path(__file__).resolve().parent
@@ -99,18 +93,29 @@ search_space = {
     "kernLength": best_kernLength, # tune.grid_search([8, 16, 32, 64]),
     "dropout": best_dropout, # tune.grid_search([.1, .3]),
     "type": best_type, # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
+    "group_classes": best_group_classes, # tune.grid_search([True, False]),
+    "adapt_classWeights": best_adapt_classWeights, # tune.grid_search([True, False])
+    "norm_rate": tune.grid_search([.25, 1., None]),
+    "nr": tune.grid_search([.25, 1., None])
 }
 
 def train_DREAMER(config):
 
       info_str = 'DREAMER_' + selected_emotion + f'_subject({subjects})_filtered({config["lowcut"]}, {config["highcut"]}, {config["order"]})_samples({config["sample"]})_start({config["start"]})_'
+      if config["group_classes"]:
+            class_weights = torch.tensor([1., 1.]).to(device)
+            nb_classes = 2
+      else:
+            class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
+            nb_classes = 5
 
       ###############################################################################
       # Data loading
       ###############################################################################
 
-      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, samples=config["sample"], start=config["start"],
-                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save, group_classes=group_classes)
+      dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, sessions=None, samples=config["sample"], start=config["start"],
+                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save,
+                              group_classes=config["group_classes"])
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -133,9 +138,10 @@ def train_DREAMER(config):
       ###############################################################################
 
       model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], dropoutRate=config['dropout'], 
-                     kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                     kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'],
+                     norm_rate=config["norm_rate"], nr=config["nr"], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-      loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
+      loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
       scaler = torch.cuda.amp.GradScaler()
 
