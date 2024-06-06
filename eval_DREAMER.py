@@ -42,6 +42,8 @@ best_D = 8
 best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
+best_norm_rate = .25
+best_nr = 1.
 
 
 best_group_classes = True
@@ -109,7 +111,8 @@ if dep_mix:
 
         # model = CapsEEGNet(nb_classes=nb_classes).to(device=device)
         model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                       norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
         loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
@@ -198,7 +201,8 @@ if dep_ind:
             ###############################################################################
 
             model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                           kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                           kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                           norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
             loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
@@ -280,7 +284,8 @@ if independent:
         ###############################################################################
 
         model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                       norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
         loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)

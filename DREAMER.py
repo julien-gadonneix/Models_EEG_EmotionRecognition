@@ -56,10 +56,12 @@ best_D = 8
 best_F2 = 64
 best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
 best_dropout = .1
+best_norm_rate = .25
+best_nr = 1.
 
 best_group_classes = True
 best_adapt_classWeights = True
-selected_emotion = 'valence'
+selected_emotion = 'arousal'
 print('Selected emotion:', selected_emotion)
 
 chans = 14
@@ -90,13 +92,13 @@ search_space = {
     "F1": best_F1, # tune.grid_search([16, 32, 64, 128, 256]),
     "D": best_D, # tune.grid_search([2, 4, 8, 16, 32]),
     "F2": best_F2, # tune.grid_search([4, 16, 64, 128, 256]),
-    "kernLength": best_kernLength, # tune.grid_search([8, 16, 32, 64]),
+    "kernLength": tune.grid_search([4, 8, 12, 16, 20, 24, 28, 32]),
     "dropout": best_dropout, # tune.grid_search([.1, .3]),
     "type": best_type, # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
     "group_classes": best_group_classes, # tune.grid_search([True, False]),
     "adapt_classWeights": best_adapt_classWeights, # tune.grid_search([True, False])
-    "norm_rate": tune.grid_search([.25, 1., None]),
-    "nr": tune.grid_search([.25, 1., None])
+    "norm_rate": best_norm_rate, # tune.grid_search([.25, 1., None]),
+    "nr": best_nr #  tune.grid_search([.25, 1., None])
 }
 
 def train_DREAMER(config):
