@@ -40,7 +40,7 @@ best_batch_size = 128 # 16
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
+best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # maybe go back to 64 for f_min = 2Hz
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
@@ -55,6 +55,7 @@ else:
       class_weights = torch.tensor([1., 1., 1., 1., 1.]).to(device)
       names = ['1', '2', '3', '4', '5']
 selected_emotion = 'valence'
+best_kernLength = best_kernLengths[selected_emotion]
 
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
