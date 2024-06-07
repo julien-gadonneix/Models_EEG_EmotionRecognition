@@ -54,14 +54,14 @@ best_batch_size = 128
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz
+best_kernLength = 16 # maybe go back to 64 because now f_min = 8Hz # 20 for arousal # 12 for dominance abd valence
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
 
 best_group_classes = True
 best_adapt_classWeights = True
-selected_emotion = 'arousal'
+selected_emotion = 'valence'
 print('Selected emotion:', selected_emotion)
 
 chans = 14
