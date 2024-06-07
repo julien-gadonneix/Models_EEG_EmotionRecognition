@@ -182,7 +182,7 @@ class CapsEEGNet(nn.Module):
 
 
 class TCNet(nn.Module):
-    def __init__(self, nb_classes, Chans=14):
+    def __init__(self, nb_classes, device, Chans=14):
         super(TCNet, self).__init__()
         """ PyTorch Implementation of TC-Net """
 
@@ -193,10 +193,10 @@ class TCNet(nn.Module):
         self.EEG_Transformer = []
         self.PatchMerging = []
         for i in range(4):
-            encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=4, batch_first=True, norm_first=True)
+            encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=4, batch_first=True, norm_first=True, device=device)
             self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=2))
             if i < 3:
-                self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1)))
+                self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
                 d *= 2
         
         self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, num_routes=8*1*124)

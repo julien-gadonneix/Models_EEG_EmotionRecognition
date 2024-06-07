@@ -29,7 +29,7 @@ class DREAMERDataset(Dataset):
         n_subjects = int(n_subjects[0, 0])
         n_videos = int(n_videos[0, 0])
 
-        X = torch.tensor([[[[]]]], dtype=torch.float32)
+        X = []
         y = torch.tensor([], dtype=torch.long)
         if subjects is None:
             print("Dataset with all subjects mixed ...")
@@ -66,16 +66,16 @@ class DREAMERDataset(Dataset):
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
                         std_baseline_eeg_j = baselines_eeg_j.std(axis=0)
-                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimulis_eeg_j.shape[0], samples)[start:]
+                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                         stimulis_eeg_j -= avg_baseline_eeg_j
                         stimulis_eeg_j /= std_baseline_eeg_j
                         if tfr is not None:
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['n_cycles'], zero_mean=True, use_fft=tfr['use_fft'],
+                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
-                            X = torch.cat((X, torch.tensor(cwt, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(cwt, dtype=torch.float32))
                             y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(cwt.shape[0])))
                         else:
-                            X = torch.cat((X, torch.tensor(stimulis_eeg_j, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(stimulis_eeg_j, dtype=torch.float32).unsqueeze(1))
                             y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_eeg_j.shape[0])))
                 else:
                     if i == 0:
@@ -90,16 +90,16 @@ class DREAMERDataset(Dataset):
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
                         std_baseline_eeg_j = baselines_eeg_j.std(axis=0)
-                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimulis_eeg_j.shape[0], samples)[start:]
+                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                         stimulis_eeg_j -= avg_baseline_eeg_j
                         stimulis_eeg_j /= std_baseline_eeg_j
                         if tfr is not None:
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['n_cycles'], zero_mean=True, use_fft=tfr['use_fft'],
+                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
-                            X = torch.cat((X, torch.tensor(cwt, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(cwt, dtype=torch.float32))
                             y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(cwt.shape[0])))
                         else:
-                            X = torch.cat((X, torch.tensor(stimulis_eeg_j, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(stimulis_eeg_j, dtype=torch.float32).unsqueeze(1))
                             y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_eeg_j.shape[0])))
         else:
             print("Dataset with subjects:", subjects, "...")
@@ -136,16 +136,16 @@ class DREAMERDataset(Dataset):
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
                         std_baseline_eeg_j = baselines_eeg_j.std(axis=0)
-                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimulis_eeg_j.shape[0], samples)[start:]
+                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                         stimulis_eeg_j -= avg_baseline_eeg_j
                         stimulis_eeg_j /= std_baseline_eeg_j
                         if tfr is not None:
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['n_cycles'], zero_mean=True, use_fft=tfr['use_fft'],
+                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
-                            X = torch.cat((X, torch.tensor(cwt, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(cwt, dtype=torch.float32))
                             y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(cwt.shape[0])))
                         else:
-                            X = torch.cat((X, torch.tensor(stimulis_eeg_j, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(stimulis_eeg_j, dtype=torch.float32).unsqueeze(1))
                             y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_eeg_j.shape[0])))
                 else:
                     if subject == subjects[0]:
@@ -160,18 +160,19 @@ class DREAMERDataset(Dataset):
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
                         std_baseline_eeg_j = baselines_eeg_j.std(axis=0)
-                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimulis_eeg_j.shape[0], samples)[start:]
+                        stimulis_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                         stimulis_eeg_j -= avg_baseline_eeg_j
                         stimulis_eeg_j /= std_baseline_eeg_j
                         if tfr is not None:
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['n_cycles'], zero_mean=True, use_fft=tfr['use_fft'],
+                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_eeg_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
-                            X = torch.cat((X, torch.tensor(cwt, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(cwt, dtype=torch.float32))
                             y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(cwt.shape[0])))
                         else:
-                            X = torch.cat((X, torch.tensor(stimulis_eeg_j, dtype=torch.float32)), dim=0)
+                            X.append(torch.tensor(stimulis_eeg_j, dtype=torch.float32).unsqueeze(1))
                             y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_eeg_j.shape[0])))
-        self.data = X.unsqueeze(1) if tfr is None else X
+        X = torch.cat(X, dim=0)
+        self.data = X
         self.targets = y
         nb_classes = 2 if group_classes else 5
         all_classes = torch.arange(nb_classes)
