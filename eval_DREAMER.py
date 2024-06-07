@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 selected_emotion = 'valence'
 selected_model = 'TCNet'
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+device = torch.device('cpu') if selected_model=='TCNet' else torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
 is_ok = device.type != 'mps'
 
