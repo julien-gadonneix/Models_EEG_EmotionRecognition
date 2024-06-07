@@ -118,13 +118,13 @@ if dep_mix:
         ###############################################################################
 
         if selected_model == 'CapsEEGNet':
-            model = CapsEEGNet(nb_classes=nb_classes).to(device=device)
+            model = CapsEEGNet(nb_classes, chans).to(device=device)
         elif selected_model == 'EEGNet':
             model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
         elif selected_model == 'TCNet':
-            model = TCNet(nb_classes=nb_classes, device=device, Chans=chans).to(device=device)
+            model = TCNet(nb_classes, device, chans).to(device=device)
         else:
             raise ValueError('Invalid model selected')
 
@@ -216,13 +216,13 @@ if dep_ind:
             ###############################################################################
 
             if selected_model == 'CapsEEGNet':
-                model = CapsEEGNet(nb_classes=nb_classes).to(device=device)
+                model = CapsEEGNet(nb_classes, chans).to(device=device)
             elif selected_model == 'EEGNet':
                 model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                                kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
                                norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
             elif selected_model == 'TCNet':
-                model = TCNet(nb_classes=nb_classes).to(device=device)
+                model = TCNet(nb_classes, device, chans).to(device=device)
             else:
                 raise ValueError('Invalid model selected')
 
@@ -308,13 +308,13 @@ if independent:
         ###############################################################################
 
         if selected_model == 'CapsEEGNet':
-            model = CapsEEGNet(nb_classes=nb_classes).to(device=device)
+            model = CapsEEGNet(nb_classes, chans).to(device=device)
         elif selected_model == 'EEGNet':
             model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
         elif selected_model == 'TCNet':
-            model = TCNet(nb_classes=nb_classes).to(device=device)
+            model = TCNet(nb_classes, device, chans).to(device=device)
         else:
             raise ValueError('Invalid model selected')
 

@@ -9,7 +9,7 @@ import os
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP
+from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG
 
@@ -24,6 +24,9 @@ from ray.tune.schedulers import ASHAScheduler
 ###############################################################################
 # Hyperparameters
 ###############################################################################
+
+selected_emotion = 'valence'
+print('Selected emotion:', selected_emotion)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 is_ok = device.type != 'mps'
@@ -43,7 +46,6 @@ best_order = 3
 best_type = 'butter'
 best_start = 1
 best_sample = 128
-# subjects = [i for i in range(23)]
 subjects = None
 
 epochs = 500
@@ -54,15 +56,14 @@ best_batch_size = 128
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLength = 16 # maybe go back to 64 for f_min = 2Hz # 20 for arousal # 12 for dominance abd valence
+best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # maybe go back to 64 for f_min = 2Hz
+best_kernLength = best_kernLengths[selected_emotion]
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
 
 best_group_classes = True
 best_adapt_classWeights = True
-selected_emotion = 'valence'
-print('Selected emotion:', selected_emotion)
 
 chans = 14
 
@@ -92,13 +93,14 @@ search_space = {
     "F1": best_F1, # tune.grid_search([16, 32, 64, 128, 256]),
     "D": best_D, # tune.grid_search([2, 4, 8, 16, 32]),
     "F2": best_F2, # tune.grid_search([4, 16, 64, 128, 256]),
-    "kernLength": tune.grid_search([4, 8, 12, 16, 20, 24, 28, 32]),
+    "kernLength": best_kernLength, # tune.grid_search([4, 8, 12, 16, 20, 24, 28, 32]),
     "dropout": best_dropout, # tune.grid_search([.1, .3]),
     "type": best_type, # tune.grid_search(["butter", "cheby1", "cheby2", "ellip", "bessel"])
     "group_classes": best_group_classes, # tune.grid_search([True, False]),
     "adapt_classWeights": best_adapt_classWeights, # tune.grid_search([True, False])
     "norm_rate": best_norm_rate, # tune.grid_search([.25, 1., None]),
-    "nr": best_nr #  tune.grid_search([.25, 1., None])
+    "nr": best_nr, #  tune.grid_search([.25, 1., None])
+    "innerChans": tune.grid_search(list(range(1, 128)))
 }
 
 def train_DREAMER(config):
@@ -117,7 +119,7 @@ def train_DREAMER(config):
 
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, sessions=None, samples=config["sample"], start=config["start"],
                               lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save,
-                              group_classes=config["group_classes"])
+                              group_classes=config["group_classes"], tfr=None)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -130,7 +132,6 @@ def train_DREAMER(config):
       test_sampler = SubsetRandomSampler(test_indices)
       train_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=train_sampler, num_workers=n_gpu*n_parallel, pin_memory=True)
       test_loader = DataLoader(dataset, batch_size=config['batch_size'], sampler=test_sampler, num_workers=n_gpu*n_parallel, pin_memory=True)
-
       print(len(train_indices), 'train samples')
       print(len(test_indices), 'test samples')
 
@@ -139,9 +140,12 @@ def train_DREAMER(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], dropoutRate=config['dropout'], 
-                     kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'],
-                     norm_rate=config["norm_rate"], nr=config["nr"], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+      # model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], dropoutRate=config['dropout'], 
+      #                kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'],
+      #                norm_rate=config["norm_rate"], nr=config["nr"], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+      model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=config["sample"], dropoutRate=config['dropout'], 
+                             kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=config["norm_rate"], nr=config["nr"],
+                             dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
       loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])

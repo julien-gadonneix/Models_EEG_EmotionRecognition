@@ -97,7 +97,7 @@ def squash(input_tensor, epsilon=1e-7):
     return output_tensor
 
 class PrimaryCaps(nn.Module):
-    def __init__(self, num_capsules=8, in_channels=16, out_channels=32, kernel_size=9, num_routes=32*1*60):
+    def __init__(self, num_capsules, in_channels, out_channels, kernel_size, num_routes):
         super(PrimaryCaps, self).__init__()
         self.num_routes = num_routes
         self.capsules = nn.ModuleList([
@@ -112,7 +112,7 @@ class PrimaryCaps(nn.Module):
         return squash(u)
 
 class EmotionCaps(nn.Module):
-    def __init__(self, num_capsules=3, num_routes=32*1*60, in_channels=8, out_channels=16):
+    def __init__(self, num_capsules, num_routes, in_channels, out_channels):
         super(EmotionCaps, self).__init__()
         self.in_channels = in_channels
         self.num_routes = num_routes
@@ -140,34 +140,25 @@ class EmotionCaps(nn.Module):
 
 
 class CapsEEGNet(nn.Module):
-    def __init__(self, nb_classes, Chans=14, dropoutRate=0.5, kernLength=64, F1=8, 
-                 D=2, F2=32, norm_rate=0.25, dropoutType='Dropout',
-                 num_capsules=8, num_routes=32*1*60, kern_size=9, out_dim=16):
+    def __init__(self, nb_classes, Chans):
         super(CapsEEGNet, self).__init__()
         """ PyTorch Implementation of EEGNet """
 
-        self.name = f'Caps-EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
-        self.norm_rate = norm_rate
-        if dropoutType == 'SpatialDropout2D':
-            self.dropoutType = nn.Dropout2d
-        elif dropoutType == 'Dropout':
-            self.dropoutType = nn.Dropout
-        else:
-            raise ValueError('dropoutType must be one of SpatialDropout2D '
-                            'or Dropout, passed as a string.')
+        self.name = f'Caps-EEGNet'
+        self.dropoutType = nn.Dropout
         
-        self.block_1_2 = nn.Sequential(nn.Conv2d(1, F1, (1, kernLength), padding='same', bias=False),
-                                    nn.BatchNorm2d(F1),
+        self.block_1_2 = nn.Sequential(nn.Conv2d(1, 8, (1, 64), padding='same', bias=False),
+                                    nn.BatchNorm2d(8),
                                     nn.ELU(), # added but not present in the other implementation
-                                    ConstrainedConv2d(F1, F1*D, (Chans, 1), bias=False, groups=F1, padding='valid', nr=1.),
-                                    nn.BatchNorm2d(D*F1),
+                                    ConstrainedConv2d(8, 8*2, (Chans, 1), bias=False, groups=8, padding='valid', nr=1.),
+                                    nn.BatchNorm2d(8*2),
                                     nn.ELU(),
                                     # nn.AvgPool2d((1, 4)), # present in the other implementation
-                                    self.dropoutType(dropoutRate))
+                                    self.dropoutType(0.5))
 
-        self.primaryCaps = PrimaryCaps(num_capsules=num_capsules, in_channels=F1*D, out_channels=F2, kernel_size=kern_size, num_routes=num_routes)
-        self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=num_routes, in_channels=num_capsules, out_channels=out_dim)
-        self.fc = nn.Linear(out_dim, 1)
+        self.primaryCaps = PrimaryCaps(num_capsules=8, in_channels=8*2, out_channels=32, kernel_size=9, num_routes=32*1*60)
+        self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=32*1*60, in_channels=8, out_channels=16)
+        self.fc = nn.Linear(16, 1)
     
 
     def forward(self, x):
@@ -182,7 +173,7 @@ class CapsEEGNet(nn.Module):
 
 
 class TCNet(nn.Module):
-    def __init__(self, nb_classes, device, Chans=14):
+    def __init__(self, nb_classes, device, Chans):
         super(TCNet, self).__init__()
         """ PyTorch Implementation of TC-Net """
 
