@@ -62,8 +62,8 @@ best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
 
-best_group_classes = True
-best_adapt_classWeights = True
+best_group_classes = False
+best_adapt_classWeights = False
 
 chans = 14
 
