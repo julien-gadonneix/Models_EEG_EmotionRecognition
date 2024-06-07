@@ -46,8 +46,8 @@ best_norm_rate = .25
 best_nr = 1.
 
 
-best_group_classes = True
-best_adapt_classWeights = True
+best_group_classes = False
+best_adapt_classWeights = False
 if best_group_classes:
       class_weights = torch.tensor([1., 1.]).to(device)
       names = ['Low', 'High']
