@@ -190,7 +190,7 @@ class TCNet(nn.Module):
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
                 d *= 2
         
-        self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, num_routes=8*1*124)
+        self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=9, num_routes=8*1*124)
         self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
     
 
