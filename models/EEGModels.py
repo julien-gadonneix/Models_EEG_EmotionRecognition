@@ -48,12 +48,11 @@ class EEGNet(nn.Module):
 
 class EEGNet_ChanRed(nn.Module):
     def __init__(self, nb_classes, Chans=64, InnerChans=14, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
-                 D=2, F2=16, norm_rate=0.25, dropoutType='Dropout'):
+                 D=2, F2=16, norm_rate=0.25, nr=1., dropoutType='Dropout'):
         super(EEGNet_ChanRed, self).__init__()
-        """ PyTorch Implementation of EEGNet """
+        """ PyTorch Implementation of Caps-EEGNet """
 
         self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
-        self.norm_rate = norm_rate
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
         elif dropoutType == 'Dropout':
@@ -66,7 +65,7 @@ class EEGNet_ChanRed(nn.Module):
         
         self.block1 = nn.Sequential(nn.Conv2d(1, F1, (1, kernLength), padding='same', bias=False),
                                     nn.BatchNorm2d(F1),
-                                    ConstrainedConv2d(F1, F1*D, (InnerChans, 1), bias=False, groups=F1, padding='valid', nr=1.),
+                                    ConstrainedConv2d(F1, F1*D, (InnerChans, 1), bias=False, groups=F1, padding='valid', nr=nr),
                                     nn.BatchNorm2d(D*F1),
                                     nn.ELU(),
                                     nn.AvgPool2d((1, 4)),
@@ -77,7 +76,7 @@ class EEGNet_ChanRed(nn.Module):
                                     nn.AvgPool2d((1, 8)),
                                     self.dropoutType(dropoutRate))
         self.flatten = nn.Flatten()
-        self.dense = ConstrainedLinear(F2*int((Samples/4)/8), nb_classes)
+        self.dense = ConstrainedLinear(F2*int((Samples/4)/8), nb_classes, norm_rate)
     
 
     def forward(self, x):
@@ -86,7 +85,7 @@ class EEGNet_ChanRed(nn.Module):
         x = self.block1(x)
         x = self.block2(x)
         x = self.flatten(x)
-        x = self.dense(x, self.norm_rate)
+        x = self.dense(x)
         return F.softmax(x, dim=1)
 
 
@@ -147,7 +146,7 @@ class CapsEEGNet(nn.Module):
         super(CapsEEGNet, self).__init__()
         """ PyTorch Implementation of EEGNet """
 
-        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
+        self.name = f'Caps-EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
         self.norm_rate = norm_rate
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
@@ -179,7 +178,46 @@ class CapsEEGNet(nn.Module):
         x = self.fc(x)
         x = x.squeeze(-1)
         return F.softmax(x, dim=1)
+    
 
+
+class TCNet(nn.Module):
+    def __init__(self, nb_classes, Chans=14):
+        super(TCNet, self).__init__()
+        """ PyTorch Implementation of TC-Net """
+
+        self.name = 'TC-Net'
+        
+        d = 32
+        self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4))
+        self.EEG_Transformer = []
+        self.PatchMerging = []
+        for i in range(4):
+            encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=4, batch_first=True, norm_first=True)
+            self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=2))
+            if i < 3:
+                self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1)))
+                d *= 2
+        
+        self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, num_routes=8*1*124)
+        self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
+    
+
+    def forward(self, x):
+        x = self.PatchPartition(x)
+        bs, fs, hs, ws = x.shape
+        for i in range(len(self.EEG_Transformer)):
+            x = x.view(bs, fs*(2**i)*4, -1)
+            x = x.permute(0, 2, 1)
+            x = self.EEG_Transformer[i](x)
+            x = x.permute(0, 2, 1)
+            x = x.view(bs, fs*(2**i), hs//(2**i), ws//(2**i))
+            if i < len(self.PatchMerging):
+                x = self.PatchMerging[i](x)
+        x = x.view(bs, 8, 1, -1)
+        x = self.primaryCaps(x)
+        x = self.emotionCaps(x)
+        return torch.norm(x, dim=2).squeeze()
 
 
 class EEGNet_SSVEP(nn.Module):

@@ -27,7 +27,7 @@ subjects = [[i] for i in range(15)]
 sessions = None
 
 epochs_dep = 150
-epochs_ind = 100
+epochs_ind = 20
 random_seed= 42
 test_split = .33
 
