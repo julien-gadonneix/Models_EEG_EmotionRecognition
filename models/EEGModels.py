@@ -195,19 +195,31 @@ class TCNet(nn.Module):
     
 
     def forward(self, x):
+        if torch.isnan(x).any():
+            raise ValueError('NaN in input to TCNet')
         x = self.PatchPartition(x)
+        if torch.isnan(x).any():
+            raise ValueError('NaN in output of PatchPartition')
         bs, fs, hs, ws = x.shape
         for i in range(len(self.EEG_Transformer)):
             x = x.view(bs, fs*(2**i)*4, -1)
             x = x.permute(0, 2, 1)
             x = self.EEG_Transformer[i](x)
+            if torch.isnan(x).any():
+                raise ValueError('NaN in output of EEG_Transformer' + str(i))
             x = x.permute(0, 2, 1)
             x = x.view(bs, fs*(2**i), hs//(2**i), ws//(2**i))
             if i < len(self.PatchMerging):
                 x = self.PatchMerging[i](x)
+                if torch.isnan(x).any():
+                    raise ValueError('NaN in output of PatchMerging' + str(i))
         x = x.view(bs, 8, 1, -1)
         x = self.primaryCaps(x)
+        if torch.isnan(x).any():
+            raise ValueError('NaN in output of primaryCaps')
         x = self.emotionCaps(x)
+        if torch.isnan(x).any():
+            raise ValueError('NaN in output of emotionCaps')
         return torch.norm(x, dim=2).squeeze()
 
 

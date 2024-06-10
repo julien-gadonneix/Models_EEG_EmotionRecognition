@@ -20,9 +20,9 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 selected_emotion = 'valence'
 selected_model = 'TCNet'
 
-device = torch.device('cpu') if selected_model=='TCNet' else torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
-is_ok = device.type != 'mps'
+is_ok = device.type != 'mps' and selected_model != 'TCNet' #TODO: understand why TCNet doesn't work with mixed precision
 
 best_highcut = None
 best_lowcut = .5
@@ -35,7 +35,7 @@ sessions = [[i] for i in range(18)]
 best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}}
 best_tfr = best_tfrs[selected_model]
 
-epochs_dep_mixs = {'EEGNet': 800, 'CapsEEGNet': 300, 'TCNet': 30}
+epochs_dep_mixs = {'EEGNet': 800, 'CapsEEGNet': 300, 'TCNet': 300}
 epochs_dep_mix = epochs_dep_mixs[selected_model]
 epochs_dep_ind = 800
 epochs_ind = 20
@@ -43,7 +43,7 @@ test_split = .25
 
 best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.000001}
 best_lr = best_lrs[selected_model]
-best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 128}
+best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 64} # TCNet should be 128 
 best_batch_size = best_batch_sizes[selected_model]
 best_F1 = 64
 best_D = 8
