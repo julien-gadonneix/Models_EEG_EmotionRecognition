@@ -100,7 +100,7 @@ search_space = {
     "adapt_classWeights": best_adapt_classWeights, # tune.grid_search([True, False])
     "norm_rate": best_norm_rate, # tune.grid_search([.25, 1., None]),
     "nr": best_nr, #  tune.grid_search([.25, 1., None])
-    "innerChans": tune.grid_search(list(range(1, 128)))
+    "innerChans": tune.grid_search(list(range(4, 129, 4)))
 }
 
 def train_DREAMER(config):
@@ -159,8 +159,8 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
-            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
