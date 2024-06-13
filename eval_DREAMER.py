@@ -57,7 +57,6 @@ for selected_emotion in emotions:
     best_nr = 1.
     best_innerChans = 18
 
-
     best_groups_classes = {'EEGNet': False, 'CapsEEGNet': True, 'TCNet': True}
     best_group_classes = best_groups_classes[selected_model]
     best_adapt_classWeights = False
@@ -227,9 +226,9 @@ for selected_emotion in emotions:
                 if selected_model == 'CapsEEGNet':
                     model = CapsEEGNet(nb_classes, chans).to(device=device)
                 elif selected_model == 'EEGNet':
-                    model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                                kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                    model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                                           kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                                           norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
                 elif selected_model == 'TCNet':
                     model = TCNet(nb_classes, device, chans).to(device=device)
                 else:
@@ -321,9 +320,9 @@ for selected_emotion in emotions:
             if selected_model == 'CapsEEGNet':
                 model = CapsEEGNet(nb_classes, chans).to(device=device)
             elif selected_model == 'EEGNet':
-                model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                                       norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
             elif selected_model == 'TCNet':
                 model = TCNet(nb_classes, device, chans).to(device=device)
             else:
