@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet
+from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss
 
@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 ###############################################################################
 
 selected_emotion = 'valence'
-selected_model = 'TCNet'
+selected_model = 'EEGNet'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
@@ -35,7 +35,7 @@ sessions = [[i] for i in range(18)]
 best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}}
 best_tfr = best_tfrs[selected_model]
 
-epochs_dep_mixs = {'EEGNet': 800, 'CapsEEGNet': 300, 'TCNet': 600} # TCNet should be 30
+epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 600} # TCNet should be 30
 epochs_dep_mix = epochs_dep_mixs[selected_model]
 epochs_dep_ind = 800
 epochs_ind = 20
@@ -53,7 +53,7 @@ best_kernLength = best_kernLengths[selected_emotion]
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
-
+best_innerChans = 18
 best_groups_classes = {'EEGNet': False, 'CapsEEGNet': True, 'TCNet': True}
 best_group_classes = best_groups_classes[selected_model]
 best_adapt_classWeights = False
@@ -120,7 +120,7 @@ if dep_mix:
         if selected_model == 'CapsEEGNet':
             model = CapsEEGNet(nb_classes, chans).to(device=device)
         elif selected_model == 'EEGNet':
-            model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
+            model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
         elif selected_model == 'TCNet':
