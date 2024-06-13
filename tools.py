@@ -65,7 +65,7 @@ def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, m
     print("Subject-" + mode + " classification accuracy on " + selected_emotion + ": %f " % (acc))
     ConfusionMatrixDisplay(confusion_matrix(preds, Y_test), display_labels=names).plot()
     plt.title("Subject-" + mode + " classification accuracy on " + selected_emotion, fontsize=10)
-    plt.xlabel("Predicted \n Classification accuracy: %.2f " % (acc))
+    plt.xlabel("Predicted \n Classification accuracy: %.4f " % (acc))
     plt.tight_layout()
     plt.savefig(figs_path + 'confusion_matrix_subject_' + mode + '_classification_' + selected_emotion +'.png')
 
