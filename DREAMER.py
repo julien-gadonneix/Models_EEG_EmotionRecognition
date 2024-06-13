@@ -119,8 +119,8 @@ def train_DREAMER(config):
       ###############################################################################
 
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, sessions=None, samples=config["sample"], start=config["start"],
-                              lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save,
-                              group_classes=config["group_classes"], tfr=None)
+                               lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save,
+                               group_classes=config["group_classes"], tfr=None, use_ecg=False)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
