@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet
+from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss
 
@@ -22,7 +22,7 @@ selected_model = 'EEGNet'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
-is_ok = device.type != 'mps' and selected_model != 'TCNet' #TODO: understand why TCNet doesn't work with mixed precision
+is_ok = device.type != 'mps' and selected_model != 'TCNet' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
 
 for selected_emotion in emotions:
     best_use_ecg = False
@@ -37,13 +37,13 @@ for selected_emotion in emotions:
     best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}}
     best_tfr = best_tfrs[selected_model]
 
-    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 300}
+    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 600} # TCNet should be 30
     epochs_dep_mix = epochs_dep_mixs[selected_model]
     epochs_dep_ind = 800
     epochs_ind = 20
     test_split = .25
 
-    best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.000001}
+    best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.0001}  # TCNet should be 0.000001
     best_lr = best_lrs[selected_model]
     best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 64} # TCNet should be 128 
     best_batch_size = best_batch_sizes[selected_model]
@@ -55,9 +55,11 @@ for selected_emotion in emotions:
     best_dropout = .1
     best_norm_rate = .25
     best_nr = 1.
+    best_innerChans = 18
 
 
-    best_group_classes = False
+    best_groups_classes = {'EEGNet': False, 'CapsEEGNet': True, 'TCNet': True}
+    best_group_classes = best_groups_classes[selected_model]
     best_adapt_classWeights = False
     if best_group_classes:
         class_weights = torch.tensor([1., 1.]).to(device)
@@ -125,9 +127,9 @@ for selected_emotion in emotions:
             if selected_model == 'CapsEEGNet':
                 model = CapsEEGNet(nb_classes, chans).to(device=device)
             elif selected_model == 'EEGNet':
-                model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=best_sample, dropoutRate=best_dropout,
-                            kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                                       norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
             elif selected_model == 'TCNet':
                 model = TCNet(nb_classes, device, chans).to(device=device)
             else:
