@@ -48,7 +48,7 @@ best_start = 1
 best_sample = 128
 subjects = None
 
-epochs = 500
+epochs = 1000
 test_split = .25
 
 best_lr = 0.001
@@ -61,6 +61,7 @@ best_kernLength = best_kernLengths[selected_emotion]
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
+best_innerChans = 18
 
 best_group_classes = False
 best_adapt_classWeights = False
@@ -83,7 +84,7 @@ num_s = 1
 ###############################################################################
 
 search_space = {
-    "lr": best_lr, # tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
+    "lr": tune.grid_search([.0005+.0001*i for i in range(11)]),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
     "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
     "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
@@ -100,7 +101,7 @@ search_space = {
     "adapt_classWeights": best_adapt_classWeights, # tune.grid_search([True, False])
     "norm_rate": best_norm_rate, # tune.grid_search([.25, 1., None]),
     "nr": best_nr, #  tune.grid_search([.25, 1., None])
-    "innerChans": tune.grid_search(list(range(4, 129, 4)))
+    "innerChans": best_innerChans # tune.grid_search(list(range(4, 65, 2)))
 }
 
 def train_DREAMER(config):
