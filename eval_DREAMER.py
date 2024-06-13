@@ -54,6 +54,7 @@ best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
 best_innerChans = 18
+
 best_groups_classes = {'EEGNet': False, 'CapsEEGNet': True, 'TCNet': True}
 best_group_classes = best_groups_classes[selected_model]
 best_adapt_classWeights = False
