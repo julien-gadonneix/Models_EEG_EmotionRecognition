@@ -37,17 +37,17 @@ class DREAMERDataset(Dataset):
                 _, _, eeg, _, val, aro, dom = data[0, i][0][0]
                 if emotion == 'valence':
                     if group_classes:
-                        labels = (val > 3) * 1
+                        labels = (val >= 3) * 1
                     else:
                         labels = val - 1
                 elif emotion == 'arousal':
                     if group_classes:
-                        labels = (aro > 3) * 1
+                        labels = (aro >= 3) * 1
                     else:
                         labels = aro - 1
                 elif emotion == 'dominance':
                     if group_classes:
-                        labels = (dom > 3) * 1
+                        labels = (dom >= 3) * 1
                     else:
                         labels = dom - 1
                 else:
@@ -107,17 +107,17 @@ class DREAMERDataset(Dataset):
                 _, _, eeg, _, val, aro, dom = data[0, subject][0][0]
                 if emotion == 'valence':
                     if group_classes:
-                        labels = (val > 3) * 1
+                        labels = (val >= 3) * 1
                     else:
                         labels = val - 1
                 elif emotion == 'arousal':
                     if group_classes:
-                        labels = (aro > 3) * 1
+                        labels = (aro >= 3) * 1
                     else:
                         labels = aro - 1
                 elif emotion == 'dominance':
                     if group_classes:
-                        labels = (dom > 3) * 1
+                        labels = (dom >= 3) * 1
                     else:
                         labels = dom - 1
                 else:
