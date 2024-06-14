@@ -26,6 +26,8 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, sele
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, Y_batch)
+        if selected_model in ['CapsEEGNet', 'TCNet']:
+            loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
         avg_loss += loss.item()
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -52,6 +54,8 @@ def test_f(model, test_loader, loss_fn, device, is_ok, selected_model):
             else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, Y_batch)
+            if selected_model in ['CapsEEGNet', 'TCNet']:
+                loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
             avg_loss += loss.item()
             _, predicted = torch.max(y_pred.data, 1)
             total += Y_batch.size(0)

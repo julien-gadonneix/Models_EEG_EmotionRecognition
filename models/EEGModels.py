@@ -168,7 +168,7 @@ class EmotionCap(nn.Module):
         u_expand = torch.unsqueeze(x, 1)
         u_tiled = torch.tile(u_expand, (1, self.num_capsule, 1, 1))
         u_hat = torch.matmul(self.W, u_tiled.unsqueeze(-1)).squeeze(-1)
-        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule)))
+        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule))).to(x.device)
         for i in range(self.routings):
             c = F.softmax(b, dim=1)
             s = torch.matmul(c, u_hat)
@@ -268,12 +268,13 @@ class TCNet(nn.Module):
         self.EEG_Transformer = []
         self.PatchMerging = []
         for i in range(4):
-            encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=4, batch_first=True, norm_first=True, device=device)
-            self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1))
+            encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=8, batch_first=True, norm_first=True, device=device)
+            self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=2, enable_nested_tensor=False))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
                 d *= 2
-        
+        self.EEG_Transformer = nn.ModuleList(self.EEG_Transformer)
+        self.PatchMerging = nn.ModuleList(self.PatchMerging)
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
         self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2')
@@ -288,7 +289,7 @@ class TCNet(nn.Module):
             x = x.permute(0, 2, 1)
             x = self.EEG_Transformer[i](x)
             x = x.permute(0, 2, 1)
-            x = x.view(bs, fs*(2**i), hs//(2**i), ws//(2**i))
+            x = x.reshape(bs, fs*(2**i), hs//(2**i), ws//(2**i))
             if i < len(self.PatchMerging):
                 x = self.PatchMerging[i](x)
         x = self.primaryCaps(x)

@@ -37,20 +37,20 @@ for selected_emotion in emotions:
     best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}}
     best_tfr = best_tfrs[selected_model]
 
-    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 600} # TCNet should be 30
+    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 1000} # TCNet should be 30
     epochs_dep_mix = epochs_dep_mixs[selected_model]
     epochs_dep_ind = 800
     epochs_ind = 20
     test_split = .25
 
-    best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.0001}  # TCNet should be 0.000001
+    best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.000005}  # TCNet should be 0.000001
     best_lr = best_lrs[selected_model]
-    best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 64} # TCNet should be 128 
+    best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 128}
     best_batch_size = best_batch_sizes[selected_model]
     best_F1 = 64
     best_D = 8
     best_F2 = 64
-    best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # maybe go back to 64 for f_min = 2Hz
+    best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # perhaps go back to 64 for f_min = 2Hz
     best_kernLength = best_kernLengths[selected_emotion]
     best_dropout = .1
     best_norm_rate = .25
@@ -152,7 +152,7 @@ for selected_emotion in emotions:
                 losses_train.append(loss)
                 acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
                 losses_test.append(loss_test)
-                if epoch % 50 == 0:
+                if epoch % 10 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
             draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 

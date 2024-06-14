@@ -56,7 +56,7 @@ best_batch_size = 128
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # maybe go back to 64 for f_min = 2Hz
+best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # perhaps go back to 64 for f_min = 2Hz
 best_kernLength = best_kernLengths[selected_emotion]
 best_dropout = .1
 best_norm_rate = .25
