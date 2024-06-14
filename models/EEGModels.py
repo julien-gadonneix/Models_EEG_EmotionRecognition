@@ -147,16 +147,11 @@ class PrimaryCap(nn.Module):
             self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, 256, kernel_size=1, stride=1, padding='valid')
     
     def forward(self, x):
-        print('\t', x.shape)
         out = self.caps(x)
-        print('\t', out.shape)
         out = torch.cat([x, out], dim=1)
-        print('\t', out.shape)
         if self.model_version == 'v2':     # MLF-CapsNet
             out = self.caps2(out)
-        print('\t', out.shape)
         out = out.reshape(out.shape[0], -1, self.dim_capsule)
-        print('\t', out.shape)
         return squash(out)
 
 class EmotionCap(nn.Module):
@@ -287,7 +282,6 @@ class TCNet(nn.Module):
 
     def forward(self, x):
         x = self.PatchPartition(x)
-        print(x.shape)
         bs, fs, hs, ws = x.shape
         for i in range(len(self.EEG_Transformer)):
             x = x.view(bs, fs*(2**i)*4, -1)
@@ -297,11 +291,8 @@ class TCNet(nn.Module):
             x = x.view(bs, fs*(2**i), hs//(2**i), ws//(2**i))
             if i < len(self.PatchMerging):
                 x = self.PatchMerging[i](x)
-        print(x.shape)
         x = self.primaryCaps(x)
-        print(x.shape)
         x = self.emotionCaps(x)
-        print(x.shape)
         return torch.norm(x, dim=2).squeeze()
 
 
