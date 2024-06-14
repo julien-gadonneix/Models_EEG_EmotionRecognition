@@ -51,7 +51,7 @@ best_batch_size = 128
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLength = 25 # perhaps go back to 100 for f_min = 2Hz
+best_kernLength = 15 # perhaps go back to 100 for f_min = 2Hz
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
@@ -82,8 +82,9 @@ search_space = {
     "F1": best_F1, # tune.grid_search([16, 32, 64, 128]),
     "D": best_D, # tune.grid_search([2, 4, 8, 16]),
     "F2": best_F2, # tune.grid_search([16, 32, 64, 128]),
-    "kernLength": tune.grid_search([10, 15, 20, 25, 30, 35, 40, 45, 50]),
+    "kernLength": best_kernLength, # tune.grid_search([10, 15, 20, 25, 30, 35, 40, 45, 50]),
     "dropout": best_dropout, # tune.grid_search([.1, .3])
+    "innerChans": tune.grid_search([12, 14, 16, 18, 20, 22, 24]),
 }
 
 def train_SEED(config):
@@ -117,7 +118,7 @@ def train_SEED(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=config['dropout'],
+      model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=best_sample, dropoutRate=config['dropout'],
                              kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=best_norm_rate, nr=best_nr,
                              dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 

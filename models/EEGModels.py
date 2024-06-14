@@ -90,10 +90,10 @@ class EEGNet_ChanRed(nn.Module):
     
 
 
-class EEGNet_CWT(nn.Module):
+class EEGNet_WT(nn.Module):
     def __init__(self, nb_classes, Chans=64, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
                  D=2, F2=16, norm_rate=0.25, nr=1., dropoutType='Dropout', nb_freqs=48):
-        super(EEGNet_CWT, self).__init__()
+        super(EEGNet_WT, self).__init__()
         """ PyTorch Implementation of EEGNet """
 
         self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
