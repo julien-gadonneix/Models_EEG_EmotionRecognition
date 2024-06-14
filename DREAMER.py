@@ -84,7 +84,7 @@ num_s = 1
 ###############################################################################
 
 search_space = {
-    "lr": tune.grid_search([.0005+.0001*i for i in range(11)]),
+    "lr": best_lr, # tune.grid_search([.0005+.0001*i for i in range(11)]),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
     "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
     "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
