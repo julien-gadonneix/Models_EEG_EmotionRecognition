@@ -5,6 +5,7 @@ import numpy as np
 import mne
 import os
 from pathlib import Path
+import emd
 
 
 class DREAMERDataset(Dataset):
@@ -91,14 +92,16 @@ class DREAMERDataset(Dataset):
                             stimulis_ecg_j -= avg_baseline_ecg_j
                             stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if tfr is not None:
+                        if isinstance(tfr, dict):
                             cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
-                            y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(cwt.shape[0])))
+                        elif tfr is not None:
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
-                            y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
+                        y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
                 else:
                     if i == 0:
                         print("... and session(s):", sessions)
@@ -131,14 +134,16 @@ class DREAMERDataset(Dataset):
                             stimulis_ecg_j -= avg_baseline_ecg_j
                             stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if tfr is not None:
+                        if isinstance(tfr, dict):
                             cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
-                            y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(cwt.shape[0])))
+                        elif tfr is not None:
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
-                            y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
+                        y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
         else:
             print("Dataset with subjects:", subjects, "...")
             for subject in subjects:
@@ -195,14 +200,16 @@ class DREAMERDataset(Dataset):
                             stimulis_ecg_j -= avg_baseline_ecg_j
                             stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if tfr is not None:
+                        if isinstance(tfr, dict):
                             cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
-                            y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(cwt.shape[0])))
+                        elif tfr is not None:
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
-                            y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
+                        y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
                 else:
                     if subject == subjects[0]:
                         print("... and session(s):", sessions)
@@ -235,14 +242,16 @@ class DREAMERDataset(Dataset):
                             stimulis_ecg_j -= avg_baseline_ecg_j
                             stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if tfr is not None:
+                        if isinstance(tfr, dict):
                             cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
-                            y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(cwt.shape[0])))
+                        elif tfr is not None:
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
-                            y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
+                        y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
         X = torch.cat(X, dim=0)
         self.data = X
         self.targets = y
