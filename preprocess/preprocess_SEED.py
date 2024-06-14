@@ -8,7 +8,7 @@ from collections import defaultdict
 
 
 class SEEDDataset(Dataset):
-    def __init__(self, path, subjects=None, videos=None, sessions=None, samples=200, start=0, save=False):
+    def __init__(self, path, subjects=None, videos=None, sessions=None, samples=200, start=1, save=False):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -19,7 +19,7 @@ class SEEDDataset(Dataset):
             self._build(path, subjects, videos, sessions, samples, start, save)
 
 
-    def _build(self, path, subjects=None, videos=None, sessions=None, samples=200, start=0, save=False):
+    def _build(self, path, subjects=None, videos=None, sessions=None, samples=200, start=1, save=False):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/SEED/'
 

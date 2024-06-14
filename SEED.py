@@ -39,11 +39,10 @@ n_parallel = 2
 
 best_start = 1
 best_sample = 200
-# subjects = [i for i in range(15)]
 subjects = None
 sessions = None
 
-epochs = 500
+epochs = 300
 random_seed= 42
 test_split = .25
 
@@ -54,12 +53,14 @@ best_D = 8
 best_F2 = 64
 best_kernLength = 25 # maybe go back to 100 because now f_min = 4Hz
 best_dropout = .1
+best_norm_rate = .25
+best_nr = 1.
 
 names = ['Negative', 'Neutral', 'Positive']
 
 nb_classes = len(names)
 chans = 62
-DREAMER_chans = 14
+best_innerChans = 14
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
@@ -78,11 +79,11 @@ num_s = 1
 search_space = {
     "lr": best_lr, # tune.sample_from(lambda spec: 10 ** (-10 * np.random.rand())),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
-    "F1": tune.grid_search([16, 32, 64, 128]),
-    "D": tune.grid_search([2, 4, 8, 16]),
-    "F2": tune.grid_search([16, 32, 64, 128]),
-    "kernLength": tune.grid_search([8, 16, 32, 64]),
-    "dropout": tune.grid_search([.1, .3])
+    "F1": best_F1, # tune.grid_search([16, 32, 64, 128]),
+    "D": best_D, # tune.grid_search([2, 4, 8, 16]),
+    "F2": best_F2, # tune.grid_search([16, 32, 64, 128]),
+    "kernLength": tune.grid_search([10, 15, 20, 25, 30, 35, 40, 45, 50]),
+    "dropout": best_dropout, # tune.grid_search([.1, .3])
 }
 
 def train_SEED(config):
@@ -116,8 +117,9 @@ def train_SEED(config):
       # Model configurations
       ###############################################################################
 
-      model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=DREAMER_chans, Samples=best_sample, dropoutRate=config['dropout'],
-                     kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+      model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=config['dropout'],
+                             kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=best_norm_rate, nr=best_nr,
+                             dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
       loss_fn = torch.nn.CrossEntropyLoss().cuda()
       optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
@@ -131,8 +133,8 @@ def train_SEED(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
-            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
@@ -145,7 +147,7 @@ def train_SEED(config):
 
                   train.report({"mean_accuracy": acc}, checkpoint=checkpoint)
 
-ray.init(num_cpus=16, num_gpus=1)
+ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
 tuner = tune.Tuner(
     tune.with_resources(train_SEED, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
     run_config=train.RunConfig(

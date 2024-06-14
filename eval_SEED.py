@@ -38,6 +38,8 @@ best_D = 8
 best_F2 = 64
 best_kernLength = 25 # maybe go back to 100 because now f_min = 4Hz
 best_dropout = .1
+best_norm_rate = .25
+best_nr = 1.
 
 names = ['Negative', 'Neutral', 'Positive']
 selected_emotion = 'happiness(SEED)'
@@ -45,7 +47,7 @@ selected_emotion = 'happiness(SEED)'
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 62
-DREAMER_chans = 14
+best_innerChans = 14
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
@@ -95,8 +97,9 @@ if dependent:
         # Model configurations
         ###############################################################################
 
-        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=DREAMER_chans, Samples=best_sample, dropoutRate=best_dropout,
-                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                               kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, norm_rate=best_norm_rate, nr=best_nr,
+                               dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
         loss_fn = torch.nn.CrossEntropyLoss().to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
@@ -112,9 +115,9 @@ if dependent:
         losses_train = []
         losses_test = []
         for epoch in range(epochs_dep):
-            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
             losses_train.append(loss)
-            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
+            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
             losses_test.append(loss_test)
             if epoch % 10 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
@@ -180,8 +183,9 @@ if independent:
         # Model configurations
         ###############################################################################
 
-        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=DREAMER_chans, Samples=best_sample, dropoutRate=best_dropout,
-                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                               kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, norm_rate=best_norm_rate, nr=best_nr,
+                               dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
         loss_fn = torch.nn.CrossEntropyLoss().to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
@@ -195,8 +199,8 @@ if independent:
         ###############################################################################
 
         for epoch in range(epochs_ind):
-            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
-            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
+            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
+            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
             if epoch % 1 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
