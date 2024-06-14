@@ -137,12 +137,58 @@ def squash(input_tensor, epsilon=1e-7):
     output_tensor = squared_norm * input_tensor / ((1. + squared_norm) * torch.sqrt(squared_norm))
     return output_tensor
 
+class PrimaryCap(nn.Module):
+    def __init__(self, inputs, dim_capsule, n_channels, kernel_size, strides, padding, model_version):
+        super(PrimaryCap, self).__init__()
+        self.model_version = model_version
+        self.dim_capsule = dim_capsule
+        self.caps = nn.Conv2d(inputs, dim_capsule*n_channels, kernel_size=kernel_size, stride=strides, padding=padding)
+        if model_version == 'v2':     # MLF-CapsNet with bottleneck layer
+            self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, 256, kernel_size=1, stride=1, padding='valid')
+    
+    def forward(self, x):
+        print('\t', x.shape)
+        out = self.caps(x)
+        print('\t', out.shape)
+        out = torch.cat([x, out], dim=1)
+        print('\t', out.shape)
+        if self.model_version == 'v2':     # MLF-CapsNet
+            out = self.caps2(out)
+        print('\t', out.shape)
+        out = out.reshape(out.shape[0], -1, self.dim_capsule)
+        print('\t', out.shape)
+        return squash(out)
+
+class EmotionCap(nn.Module):
+    def __init__(self, num_capsule, dim_capsule, routings, input_num_capsule, input_dim_capsule):
+        super(EmotionCap, self).__init__()
+        self.num_capsule = num_capsule
+        self.dim_capsule = dim_capsule
+        self.routings = routings
+        self.input_num_capsule = input_num_capsule
+        self.input_dim_capsule = input_dim_capsule
+        self.W = nn.Parameter(nn.init.xavier_uniform_(torch.zeros(self.num_capsule, self.input_num_capsule, self.dim_capsule, self.input_dim_capsule)))
+
+    def forward(self, x):
+        u_expand = torch.unsqueeze(x, 1)
+        u_tiled = torch.tile(u_expand, (1, self.num_capsule, 1, 1))
+        u_hat = torch.matmul(self.W, u_tiled.unsqueeze(-1)).squeeze(-1)
+        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule)))
+        for i in range(self.routings):
+            c = F.softmax(b, dim=1)
+            s = torch.matmul(c, u_hat)
+            v = squash(s).permute(0, 1, 3, 2)
+            if i < self.routings - 1:
+                a = torch.matmul(u_hat, v)
+                b += a.permute(0, 1, 3, 2)
+        return v.squeeze(-1)
+
 class PrimaryCaps(nn.Module):
     def __init__(self, num_capsules, in_channels, out_channels, kernel_size, num_routes):
         super(PrimaryCaps, self).__init__()
         self.num_routes = num_routes
         self.capsules = nn.ModuleList([
-            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(1, kernel_size), stride=2, padding=0)
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=2, padding=0)
             for _ in range(num_capsules)])
         self.relu = nn.ReLU()
 
@@ -190,15 +236,17 @@ class CapsEEGNet(nn.Module):
         
         self.block_1_2 = nn.Sequential(nn.Conv2d(1, 8, (1, 64), padding='same', bias=False),
                                     nn.BatchNorm2d(8),
-                                    nn.ELU(), # added but not present in the other implementation
+                                    nn.ELU(), # added but not present in EEGNet
                                     ConstrainedConv2d(8, 8*2, (Chans, 1), bias=False, groups=8, padding='valid', nr=1.),
                                     nn.BatchNorm2d(8*2),
                                     nn.ELU(),
-                                    # nn.AvgPool2d((1, 4)), # present in the other implementation
+                                    # nn.AvgPool2d((1, 4)), # present in EEGNet
                                     self.dropoutType(0.5))
 
-        self.primaryCaps = PrimaryCaps(num_capsules=8, in_channels=8*2, out_channels=32, kernel_size=9, num_routes=32*1*60)
-        self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=32*1*60, in_channels=8, out_channels=16)
+        # self.primaryCaps = PrimaryCaps(num_capsules=8, in_channels=8*2, out_channels=32, kernel_size=(1, 6), num_routes=32*1*60)
+        # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=32*1*60, in_channels=8, out_channels=16)
+        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v2') # ReLU activation after the convolutional layer not present but residual present
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8)
         self.fc = nn.Linear(16, 1)
     
 
@@ -226,41 +274,34 @@ class TCNet(nn.Module):
         self.PatchMerging = []
         for i in range(4):
             encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=4, batch_first=True, norm_first=True, device=device)
-            self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=2))
+            self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
                 d *= 2
         
-        self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=9, num_routes=8*1*124)
-        self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
+        # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
+        # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
+        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2')
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, d, 8)
     
 
     def forward(self, x):
-        if torch.isnan(x).any():
-            raise ValueError('NaN in input to TCNet')
         x = self.PatchPartition(x)
-        if torch.isnan(x).any():
-            raise ValueError('NaN in output of PatchPartition')
+        print(x.shape)
         bs, fs, hs, ws = x.shape
         for i in range(len(self.EEG_Transformer)):
             x = x.view(bs, fs*(2**i)*4, -1)
             x = x.permute(0, 2, 1)
             x = self.EEG_Transformer[i](x)
-            if torch.isnan(x).any():
-                raise ValueError('NaN in output of EEG_Transformer' + str(i))
             x = x.permute(0, 2, 1)
             x = x.view(bs, fs*(2**i), hs//(2**i), ws//(2**i))
             if i < len(self.PatchMerging):
                 x = self.PatchMerging[i](x)
-                if torch.isnan(x).any():
-                    raise ValueError('NaN in output of PatchMerging' + str(i))
-        x = x.view(bs, 8, 1, -1)
+        print(x.shape)
         x = self.primaryCaps(x)
-        if torch.isnan(x).any():
-            raise ValueError('NaN in output of primaryCaps')
+        print(x.shape)
         x = self.emotionCaps(x)
-        if torch.isnan(x).any():
-            raise ValueError('NaN in output of emotionCaps')
+        print(x.shape)
         return torch.norm(x, dim=2).squeeze()
 
 
