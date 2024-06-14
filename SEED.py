@@ -60,7 +60,7 @@ names = ['Negative', 'Neutral', 'Positive']
 
 nb_classes = len(names)
 chans = 62
-best_innerChans = 14
+best_innerChans = 18
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'

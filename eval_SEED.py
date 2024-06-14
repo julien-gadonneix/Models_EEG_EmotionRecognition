@@ -47,7 +47,7 @@ selected_emotion = 'happiness(SEED)'
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 62
-best_innerChans = 14
+best_innerChans = 18
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
