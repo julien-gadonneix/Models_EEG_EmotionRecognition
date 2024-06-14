@@ -31,7 +31,6 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, sele
         scaler.step(optimizer)
         scaler.update()
     return avg_loss / len(train_loader)
-    
 
 
 def test_f(model, test_loader, loss_fn, device, is_ok, selected_model):
@@ -105,3 +104,8 @@ def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, 
     plt.xlabel("Predicted \n Classification accuracy: %.2f " % (acc))
     plt.tight_layout()
     plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_xDawnRG.png')
+
+
+def margin_loss(y_true, y_pred):
+    L = y_true * torch.square(torch.maximum(0., 0.9 - y_pred)) + 0.5 * (1 - y_true) * torch.square(torch.maximum(0., y_pred - 0.1))
+    return torch.mean(torch.sum(L, 1))

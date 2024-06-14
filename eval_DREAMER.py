@@ -8,7 +8,7 @@ from pathlib import Path
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss
+from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, margin_loss
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -247,7 +247,10 @@ for selected_emotion in emotions:
                 else:
                     raise ValueError('Invalid model selected')
 
-                loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+                if selected_model in ['CapsEEGNet', 'TCNet']:
+                    loss_fn = margin_loss.to(device)
+                else:
+                    loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
                 optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
                 scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
