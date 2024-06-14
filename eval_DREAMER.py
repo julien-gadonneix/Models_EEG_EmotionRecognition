@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 ###############################################################################
 
 emotions = ['arousal', 'dominance', 'valence']
-selected_model = 'TCNet'
+selected_model = 'EEGNet'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
@@ -108,15 +108,19 @@ for selected_emotion in emotions:
             indices = list(range(dataset_size))
             np.random.shuffle(indices)
             split_test = int(np.floor(test_split * dataset_size))
-            train_indices, test_indices = indices[split_test:], indices[:split_test]
+            split_val = int(split_test / 2)
+            train_indices, test_indices, val_indices = indices[split_test:], indices[split_val:split_test], indices[:split_val]
 
             # Creating data samplers and loaders:
             train_sampler = SubsetRandomSampler(train_indices)
             test_sampler = SubsetRandomSampler(test_indices)
+            val_sampler = SubsetRandomSampler(val_indices)
             train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
             test_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
+            val_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=val_sampler, pin_memory=True)
             print(len(train_indices), 'train samples')
             print(len(test_indices), 'test samples')
+            print(len(val_indices), 'validation samples')
 
 
             ###############################################################################
@@ -147,17 +151,22 @@ for selected_emotion in emotions:
 
             losses_train = []
             losses_test = []
+            best_loss = np.inf
             for epoch in range(epochs_dep_mix):
                 loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
                 losses_train.append(loss)
                 acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
                 losses_test.append(loss_test)
+                if loss_test < best_loss:
+                    best_loss = loss_test
+                    torch.save(model.state_dict(), models_path + 'best.pt')
                 if epoch % 50 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
             draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
+            model.load_state_dict(torch.load(models_path + 'best.pt'))
             with torch.no_grad():
-                for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                for batch_index, (X_batch, Y_batch) in enumerate(val_loader):
                     if selected_model not in ['CapsEEGNet', 'TCNet']:
                         X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                     else:
@@ -208,15 +217,19 @@ for selected_emotion in emotions:
                 test_indices = list(range(dataset_test_size))
                 np.random.shuffle(train_indices)
                 np.random.shuffle(test_indices)
+                split_val = int(dataset_test_size / 2)
+                val_indices, test_indices = test_indices[:split_val], test_indices[split_val:]
 
                 # Creating data samplers and loaders:
                 train_sampler = SubsetRandomSampler(train_indices)
                 test_sampler = SubsetRandomSampler(test_indices)
+                val_sampler = SubsetRandomSampler(val_indices)
                 train_loader = DataLoader(dataset_train, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
                 test_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
-
+                val_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=val_sampler, pin_memory=True)
                 print(len(train_indices), 'train samples')
                 print(len(test_indices), 'test samples')
+                print(len(val_indices), 'validation samples')
 
 
                 ###############################################################################
@@ -245,14 +258,19 @@ for selected_emotion in emotions:
                 # Train and test
                 ###############################################################################
 
+                best_loss = np.inf
                 for epoch in range(epochs_dep_ind):
                     loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
                     acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
-                    if epoch % 100 == 0:
+                    if loss_test < best_loss:
+                        best_loss = loss_test
+                        torch.save(model.state_dict(), models_path + 'best.pt')
+                    if epoch % 10 == 0:
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
+                model.load_state_dict(torch.load(models_path + 'best.pt'))
                 with torch.no_grad():
-                    for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                    for batch_index, (X_batch, Y_batch) in enumerate(val_loader):
                         if selected_model not in ['CapsEEGNet', 'TCNet']:
                             X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                         else:
@@ -302,15 +320,19 @@ for selected_emotion in emotions:
             test_indices = list(range(dataset_test_size))
             np.random.shuffle(train_indices)
             np.random.shuffle(test_indices)
+            split_val = int(dataset_test_size / 2)
+            val_indices, test_indices = test_indices[:split_val], test_indices[split_val:]
 
             # Creating data samplers and loaders:
             train_sampler = SubsetRandomSampler(train_indices)
             test_sampler = SubsetRandomSampler(test_indices)
+            val_sampler = SubsetRandomSampler(val_indices)
             train_loader = DataLoader(dataset_train, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
             test_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
-
+            val_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=val_sampler, pin_memory=True)
             print(len(train_indices), 'train samples')
             print(len(test_indices), 'test samples')
+            print(len(val_indices), 'validation samples')
 
 
             ###############################################################################
@@ -339,14 +361,19 @@ for selected_emotion in emotions:
             # Train and test
             ###############################################################################
 
+            best_loss = np.inf
             for epoch in range(epochs_ind):
                 loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
                 acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
+                if loss_test < best_loss:
+                    best_loss = loss_test
+                    torch.save(model.state_dict(), models_path + 'best.pt')
                 if epoch % 1 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
+            model.load_state_dict(torch.load(models_path + 'best.pt'))
             with torch.no_grad():
-                for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                for batch_index, (X_batch, Y_batch) in enumerate(val_loader):
                     if selected_model not in ['CapsEEGNet', 'TCNet']:
                         X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                     else:
