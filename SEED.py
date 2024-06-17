@@ -84,7 +84,7 @@ search_space = {
     "F2": best_F2, # tune.grid_search([16, 32, 64, 128]),
     "kernLength": best_kernLength, # tune.grid_search([10, 15, 20, 25, 30, 35, 40, 45, 50]),
     "dropout": best_dropout, # tune.grid_search([.1, .3])
-    "innerChans": tune.grid_search([12, 14, 16, 18, 20, 22, 24]),
+    "innerChans": tune.grid_search([18, 20, 22, 24, 26, 28, 30, 32]),
 }
 
 def train_SEED(config):
@@ -172,7 +172,7 @@ dfs = {result.path: result.metrics_dataframe for result in results}
 ax = None
 for d in dfs.values():
       ax = d.mean_accuracy.plot(ax=ax, legend=False)
-plt.title("Best config is: \n" + str(results.get_best_result().config), fontsize=10)
+plt.title("Best config is: \n" + str(results.get_best_result().config), fontsize=8)
 plt.xlabel("Epochs")
 plt.ylabel("Mean Accuracy")
 plt.savefig(figs_path + 'tune_model_results.png')
