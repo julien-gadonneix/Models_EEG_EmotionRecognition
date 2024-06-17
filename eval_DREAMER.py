@@ -9,6 +9,7 @@ from pathlib import Path
 from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, margin_loss
+from sklearn.model_selection import KFold
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -41,7 +42,6 @@ for selected_emotion in emotions:
     epochs_dep_mix = epochs_dep_mixs[selected_model]
     epochs_dep_ind = 800
     epochs_ind = 20
-    test_split = .25
 
     best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.000001}  # TCNet should be 0.000001
     best_lr = best_lrs[selected_model]
@@ -69,6 +69,7 @@ for selected_emotion in emotions:
 
     n_components = 2  # pick some components for xDawnRG
     nb_classes = len(names)
+    splits = KFold(n_splits=10, shuffle=True, random_state=42)
     chans = 14
     if best_use_ecg:
         chans += 2
@@ -105,86 +106,73 @@ for selected_emotion in emotions:
                                     tfr=best_tfr, use_ecg=best_use_ecg)
             dataset_size = len(dataset)
 
-            indices = list(range(dataset_size))
-            np.random.shuffle(indices)
-            split_test = int(np.floor(test_split * dataset_size))
-            split_val = int(split_test / 2)
-            train_indices, test_indices, val_indices = indices[split_test:], indices[split_val:split_test], indices[:split_val]
-
-            # Creating data samplers and loaders:
-            train_sampler = SubsetRandomSampler(train_indices)
-            test_sampler = SubsetRandomSampler(test_indices)
-            val_sampler = SubsetRandomSampler(val_indices)
-            train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
-            test_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
-            val_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=val_sampler, pin_memory=True)
-            print(len(train_indices), 'train samples')
-            print(len(test_indices), 'test samples')
-            print(len(val_indices), 'validation samples')
+            for i, (train_idx, val_idx) in enumerate(splits.split(list(range(dataset_size)))):
+                print("Fold no.{}:".format(i + 1))
+                train_sampler = SubsetRandomSampler(train_idx)
+                valid_sampler = SubsetRandomSampler(val_idx)
+                train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
+                valid_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=valid_sampler, pin_memory=True)
+                print(len(train_idx), 'train samples')
+                print(len(val_idx), 'test samples')
 
 
-            ###############################################################################
-            # Model configurations
-            ###############################################################################
+                ###############################################################################
+                # Model configurations
+                ###############################################################################
 
-            if selected_model == 'CapsEEGNet':
-                model = CapsEEGNet(nb_classes, chans).to(device=device)
-            elif selected_model == 'EEGNet':
-                model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
-                                       kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                       norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
-            elif selected_model == 'TCNet':
-                model = TCNet(nb_classes, device, chans).to(device=device)
-            else:
-                raise ValueError('Invalid model selected')
+                if selected_model == 'CapsEEGNet':
+                    model = CapsEEGNet(nb_classes, chans).to(device=device)
+                elif selected_model == 'EEGNet':
+                    model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                                        kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                                        norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                elif selected_model == 'TCNet':
+                    model = TCNet(nb_classes, device, chans).to(device=device)
+                else:
+                    raise ValueError('Invalid model selected')
 
-            if selected_model in ['CapsEEGNet', 'TCNet']:
-                loss_fn = margin_loss
-            else:
-                loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
-            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
-            scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
+                if selected_model in ['CapsEEGNet', 'TCNet']:
+                    loss_fn = margin_loss
+                else:
+                    loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+                optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+                scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
-            torch.backends.cudnn.benchmark = True
+                torch.backends.cudnn.benchmark = True
 
 
-            ###############################################################################
-            # Train and test
-            ###############################################################################
+                ###############################################################################
+                # Train and test
+                ###############################################################################
 
-            losses_train = []
-            losses_test = []
-            best_loss = np.inf
-            for epoch in range(epochs_dep_mix):
-                loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
-                losses_train.append(loss)
-                acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
-                losses_test.append(loss_test)
-                if loss_test < best_loss:
-                    best_loss = loss_test
-                    torch.save(model.state_dict(), models_path + 'best.pt')
-                if epoch % 10 == 0:
-                    print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
-            draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
+                losses_train = []
+                losses_test = []
+                for epoch in range(epochs_dep_mix):
+                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
+                    losses_train.append(loss)
+                    acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok, selected_model)
+                    losses_test.append(loss_test)
+                    if epoch % 10 == 0:
+                        print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
+                draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
-            model.load_state_dict(torch.load(models_path + 'best.pt'))
-            with torch.no_grad():
-                for batch_index, (X_batch, Y_batch) in enumerate(val_loader):
-                    if selected_model not in ['CapsEEGNet', 'TCNet']:
-                        X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
-                    else:
-                        X_batch = X_batch.to(device=device)
-                    if is_ok:
-                        with torch.autocast(device_type=device.type, dtype=torch.float16):
+                with torch.no_grad():
+                    for batch_index, (X_batch, Y_batch) in enumerate(valid_loader):
+                        if selected_model not in ['CapsEEGNet', 'TCNet']:
+                            X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
+                        else:
+                            X_batch = X_batch.to(device=device)
+                        if is_ok:
+                            with torch.autocast(device_type=device.type, dtype=torch.float16):
+                                y_pred = model(X_batch)
+                        else:
                             y_pred = model(X_batch)
-                    else:
-                        y_pred = model(X_batch)
-                    _, predicted = torch.max(y_pred.data, 1)
-                    preds.append(predicted.cpu().numpy())
-                    target = Y_batch
-                    Y_test.append(target.numpy())
+                        _, predicted = torch.max(y_pred.data, 1)
+                        preds.append(predicted.cpu().numpy())
+                        target = Y_batch
+                        Y_test.append(target.numpy())
 
-        classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
+            classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
 
     ###############################################################################
@@ -220,19 +208,14 @@ for selected_emotion in emotions:
                 test_indices = list(range(dataset_test_size))
                 np.random.shuffle(train_indices)
                 np.random.shuffle(test_indices)
-                split_val = int(dataset_test_size / 2)
-                val_indices, test_indices = test_indices[:split_val], test_indices[split_val:]
 
                 # Creating data samplers and loaders:
                 train_sampler = SubsetRandomSampler(train_indices)
                 test_sampler = SubsetRandomSampler(test_indices)
-                val_sampler = SubsetRandomSampler(val_indices)
                 train_loader = DataLoader(dataset_train, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
                 test_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
-                val_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=val_sampler, pin_memory=True)
                 print(len(train_indices), 'train samples')
                 print(len(test_indices), 'test samples')
-                print(len(val_indices), 'validation samples')
 
 
                 ###############################################################################
@@ -264,19 +247,14 @@ for selected_emotion in emotions:
                 # Train and test
                 ###############################################################################
 
-                best_loss = np.inf
                 for epoch in range(epochs_dep_ind):
                     loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
                     acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
-                    if loss_test < best_loss:
-                        best_loss = loss_test
-                        torch.save(model.state_dict(), models_path + 'best.pt')
                     if epoch % 10 == 0:
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
-                model.load_state_dict(torch.load(models_path + 'best.pt'))
                 with torch.no_grad():
-                    for batch_index, (X_batch, Y_batch) in enumerate(val_loader):
+                    for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
                         if selected_model not in ['CapsEEGNet', 'TCNet']:
                             X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                         else:
@@ -326,19 +304,14 @@ for selected_emotion in emotions:
             test_indices = list(range(dataset_test_size))
             np.random.shuffle(train_indices)
             np.random.shuffle(test_indices)
-            split_val = int(dataset_test_size / 2)
-            val_indices, test_indices = test_indices[:split_val], test_indices[split_val:]
 
             # Creating data samplers and loaders:
             train_sampler = SubsetRandomSampler(train_indices)
             test_sampler = SubsetRandomSampler(test_indices)
-            val_sampler = SubsetRandomSampler(val_indices)
             train_loader = DataLoader(dataset_train, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
             test_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
-            val_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=val_sampler, pin_memory=True)
             print(len(train_indices), 'train samples')
             print(len(test_indices), 'test samples')
-            print(len(val_indices), 'validation samples')
 
 
             ###############################################################################
@@ -370,19 +343,14 @@ for selected_emotion in emotions:
             # Train and test
             ###############################################################################
 
-            best_loss = np.inf
             for epoch in range(epochs_ind):
                 loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
                 acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
-                if loss_test < best_loss:
-                    best_loss = loss_test
-                    torch.save(model.state_dict(), models_path + 'best.pt')
                 if epoch % 1 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
-            model.load_state_dict(torch.load(models_path + 'best.pt'))
             with torch.no_grad():
-                for batch_index, (X_batch, Y_batch) in enumerate(val_loader):
+                for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
                     if selected_model not in ['CapsEEGNet', 'TCNet']:
                         X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                     else:
