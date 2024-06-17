@@ -97,8 +97,8 @@ class DREAMERDataset(Dataset):
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
-                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
-                            X.append(torch.tensor(imfs, dtype=torch.float32))
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=tfr) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32).permute(0, 1, 3, 2))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
@@ -139,8 +139,8 @@ class DREAMERDataset(Dataset):
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
-                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
-                            X.append(torch.tensor(imfs, dtype=torch.float32))
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=tfr) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32).permute(0, 1, 3, 2))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
@@ -205,8 +205,8 @@ class DREAMERDataset(Dataset):
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
-                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
-                            X.append(torch.tensor(imfs, dtype=torch.float32))
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=tfr) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32).permute(0, 1, 3, 2))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
@@ -247,8 +247,8 @@ class DREAMERDataset(Dataset):
                                                                        output=tfr['output'], verbose=False)
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
-                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=9) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
-                            X.append(torch.tensor(imfs, dtype=torch.float32))
+                            imfs = np.array([[emd.sift.sift(stimulis_j[i, j], max_imfs=tfr) for j in range(stimulis_j.shape[1])] for i in range(stimulis_j.shape[0])])
+                            X.append(torch.tensor(imfs, dtype=torch.float32).permute(0, 1, 3, 2))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))

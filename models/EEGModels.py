@@ -3,6 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.utils import *
 from torch.autograd import Variable
+import math
+from einops.layers.torch import Rearrange
+from einops import rearrange
+import numpy as np
 
 
 
@@ -143,13 +147,14 @@ class PrimaryCap(nn.Module):
         self.model_version = model_version
         self.dim_capsule = dim_capsule
         self.caps = nn.Conv2d(inputs, dim_capsule*n_channels, kernel_size=kernel_size, stride=strides, padding=padding)
-        if model_version == 'v2':     # MLF-CapsNet with bottleneck layer
+        if model_version == 'v2':
             self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, 256, kernel_size=1, stride=1, padding='valid')
     
     def forward(self, x):
         out = self.caps(x)
-        out = torch.cat([x, out], dim=1)
-        if self.model_version == 'v2':     # MLF-CapsNet
+        if self.model_version != 'v0':
+            out = torch.cat([x, out], dim=1)
+        if self.model_version == 'v2':
             out = self.caps2(out)
         out = out.reshape(out.shape[0], -1, self.dim_capsule)
         return squash(out)
@@ -224,9 +229,9 @@ class EmotionCaps(nn.Module):
 class CapsEEGNet(nn.Module):
     def __init__(self, nb_classes, Chans):
         super(CapsEEGNet, self).__init__()
-        """ PyTorch Implementation of EEGNet """
+        """ PyTorch Implementation of Caps-EEGNet """
 
-        self.name = f'Caps-EEGNet'
+        self.name = 'Caps-EEGNet'
         self.dropoutType = nn.Dropout
         
         self.block_1_2 = nn.Sequential(nn.Conv2d(1, 8, (1, 64), padding='same', bias=False),
@@ -256,6 +261,98 @@ class CapsEEGNet(nn.Module):
     
 
 
+# need these for TCNet
+class ShiftedWindowMSA(nn.Module):
+    def __init__(self, emb_size, num_heads, window_size=2, shifted=True):
+        super().__init__()
+        self.emb_size = emb_size
+        self.num_heads = num_heads
+        self.window_size = window_size
+        self.shifted = shifted
+        self.linear1 = nn.Linear(emb_size, 3*emb_size)
+        self.linear2 = nn.Linear(emb_size, emb_size)
+        self.pos_embeddings = nn.Parameter(torch.randn(window_size*2 - 1, window_size*2 - 1))
+        self.indices = torch.tensor(np.array([[x, y] for x in range(window_size) for y in range(window_size)]))
+        self.relative_indices = self.indices[None, :, :] - self.indices[:, None, :]
+        self.relative_indices += self.window_size - 1
+
+    def forward(self, x):
+        h_dim = self.emb_size / self.num_heads
+        _, _, height, width = x.shape
+        x = rearrange(x, 'b c h w -> b (h w) c')
+        x = self.linear1(x)
+        x = rearrange(x, 'b (h w) (c k) -> b h w c k', h=height, w=width, k=3, c=self.emb_size)
+        if self.shifted:
+            x = torch.roll(x, (-self.window_size//2, -self.window_size//2), dims=(1,2))
+        x = rearrange(x, 'b (Wh w1) (Ww w2) (e H) k -> b H Wh Ww (w1 w2) e k', w1=self.window_size, w2=self.window_size, H=self.num_heads)            
+        Q, K, V = x.chunk(3, dim=6)
+        Q, K, V = Q.squeeze(-1), K.squeeze(-1), V.squeeze(-1)
+        wei = (Q @ K.transpose(4,5)) / np.sqrt(h_dim)
+        rel_pos_embedding = self.pos_embeddings[self.relative_indices[:, :, 0], self.relative_indices[:, :, 1]]
+        wei += rel_pos_embedding
+        if self.shifted:
+            row_mask = torch.zeros((self.window_size**2, self.window_size**2)).to(x.device)
+            row_mask[-self.window_size * (self.window_size//2):, 0:-self.window_size * (self.window_size//2)] = float('-inf')
+            row_mask[0:-self.window_size * (self.window_size//2), -self.window_size * (self.window_size//2):] = float('-inf')
+            column_mask = rearrange(row_mask, '(r w1) (c w2) -> (w1 r) (w2 c)', w1=self.window_size, w2=self.window_size)
+            wei[:, :, -1, :] += row_mask
+            wei[:, :, :, -1] += column_mask
+        wei = F.softmax(wei, dim=-1) @ V
+        x = rearrange(wei, 'b H Wh Ww (w1 w2) e -> b (Wh w1) (Ww w2) (H e)', w1=self.window_size, w2=self.window_size, H=self.num_heads)
+        x = rearrange(x, 'b h w c -> b (h w) c')
+        return self.linear2(x)
+    
+class MLP(nn.Module):
+    def __init__(self, emb_size):
+        super().__init__()
+        self.ff = nn.Sequential(
+                         nn.Linear(emb_size, 4*emb_size),
+                         nn.GELU(),
+                         nn.Linear(4*emb_size, emb_size)
+                  )
+    
+    def forward(self, x):
+        return self.ff(x)
+    
+class SwinEncoder(nn.Module):
+    def __init__(self, emb_size, num_heads, window_size=2):
+        super().__init__()
+        self.WMSA = ShiftedWindowMSA(emb_size, num_heads, window_size, shifted=False)
+        self.SWMSA = ShiftedWindowMSA(emb_size, num_heads, window_size, shifted=True)
+        self.ln = nn.LayerNorm(emb_size)
+        self.MLP = MLP(emb_size)
+        
+    def forward(self, x):
+        _, _, height, width = x.shape
+        x_reshaped = rearrange(x, 'b c h w -> b (h w) c')
+        x_ln = self.ln(x_reshaped)
+        x = rearrange(x_ln, 'b (h w) c -> b c h w', h=height, w=width)
+        x = x_reshaped + self.WMSA(x)
+        x = x + self.MLP(self.ln(x))
+        x_ln = self.ln(x)
+        x_reshaped =  rearrange(x_ln, 'b (h w) c -> b c h w', h=height, w=width)
+        x = x + self.SWMSA(x_reshaped)
+        x = x + self.MLP(self.ln(x))
+        return x
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=200):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position.float() * div_term)
+        pe[:, 1::2] = torch.cos(position.float() * div_term)
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+    
+    def forward(self, x):
+        x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        return self.dropout(x)
+    
+
+
 class TCNet(nn.Module):
     def __init__(self, nb_classes, device, Chans):
         super(TCNet, self).__init__()
@@ -265,36 +362,75 @@ class TCNet(nn.Module):
         
         d = 32
         self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4))
-        self.EEG_Transformer = []
+        # self.EEG_Transformer = []
+        # self.PositionalEncoding = []
+        self.stages = []
         self.PatchMerging = []
         for i in range(4):
-            encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=8, batch_first=True, norm_first=True, device=device)
-            self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=2, enable_nested_tensor=False))
+            # self.PositionalEncoding.append(PositionalEncoding(d*4, max_len=int(128/(4**i))))
+            # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
+            # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
+            # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
+            self.stages.append(SwinEncoder(d, 2, window_size=2))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
                 d *= 2
-        self.EEG_Transformer = nn.ModuleList(self.EEG_Transformer)
+        # self.PositionalEncoding = nn.ModuleList(self.PositionalEncoding)
+        # self.EEG_Transformer = nn.ModuleList(self.EEG_Transformer)
+        self.stages = nn.ModuleList(self.stages)
         self.PatchMerging = nn.ModuleList(self.PatchMerging)
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
-        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2')
-        self.emotionCaps = EmotionCap(nb_classes, 16, 3, d, 8)
+        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v0')
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8)
+
+
+    def generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
     
 
     def forward(self, x):
         x = self.PatchPartition(x)
-        bs, fs, hs, ws = x.shape
-        for i in range(len(self.EEG_Transformer)):
-            x = x.view(bs, fs*(2**i)*4, -1)
-            x = x.permute(0, 2, 1)
-            x = self.EEG_Transformer[i](x)
-            x = x.permute(0, 2, 1)
-            x = x.reshape(bs, fs*(2**i), hs//(2**i), ws//(2**i))
+        # bs, fs, hs, ws = x.shape
+        for i in range(len(self.stages)):
+            _, _, height, width = x.shape
+            # x = x.view(bs, fs*(2**i)*4, -1)
+            # x = x.permute(0, 2, 1)
+            # x = self.PositionalEncoding[i](x) * math.sqrt(fs*(2**i)*4)
+            # x = self.EEG_Transformer[i](x)
+            x = self.stages[i](x)
+            x = rearrange(x, 'b (h w) c -> b c h w', h=height, w=width)
+            # x = x.permute(0, 2, 1)
+            # x = x.reshape(bs, fs*(2**i), hs//(2**i), ws//(2**i))
             if i < len(self.PatchMerging):
                 x = self.PatchMerging[i](x)
         x = self.primaryCaps(x)
         x = self.emotionCaps(x)
         return torch.norm(x, dim=2).squeeze()
+
+
+
+class MLFCapsNet(nn.Module):
+    def __init__(self, nb_classes, Chans):
+        super(MLFCapsNet, self).__init__()
+        """ PyTorch Implementation of MLF-CapsNet """
+
+        self.name = 'MLF-CapsNet'
+        
+        self.conv = nn.Conv2d(1, 256, 6, 2, padding='valid') #TODO: test it
+        self.relu = nn.ReLU()
+        self.primaryCaps = PrimaryCap(256, 8, 32, 6, 1, 'same', 'v2')
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8)
+    
+
+    def forward(self, x):
+        x = self.relu(self.conv(x))
+        x = self.primaryCaps(x)
+        x = self.emotionCaps(x)
+        return torch.norm(x, dim=2).squeeze()
+
 
 
 class EEGNet_SSVEP(nn.Module):

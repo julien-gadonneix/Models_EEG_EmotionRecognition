@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 from pyriemann.estimation import XdawnCovariances
 from pyriemann.tangentspace import TangentSpace
@@ -14,7 +15,7 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, sele
     model.train()
     avg_loss = 0
     for X_batch, Y_batch in train_loader:
-        if selected_model not in ['CapsEEGNet', 'TCNet']:
+        if selected_model not in ['CapsEEGNet', 'TCNet']: # TODO: use model.name instead of selected_model
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         else:
             X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
@@ -28,6 +29,8 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, sele
             loss = loss_fn(y_pred, Y_batch)
         if selected_model in ['CapsEEGNet', 'TCNet']:
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
+        if selected_model == 'MLFCapsNet':
+            loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
         avg_loss += loss.item()
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -110,6 +113,7 @@ def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, 
     plt.savefig(figs_path + 'confusion_matrix_' + info_str + '_xDawnRG.png')
 
 
-def margin_loss(y_true, y_pred):
-    L = y_true * torch.square(torch.maximum(0., 0.9 - y_pred)) + 0.5 * (1 - y_true) * torch.square(torch.maximum(0., y_pred - 0.1))
+def margin_loss(y_pred, y_true):
+    y_true = F.one_hot(y_true, num_classes=y_pred.shape[1])
+    L = y_true * torch.square(torch.maximum(torch.zeros_like(y_pred), 0.9 - y_pred)) + 0.5 * (1 - y_true) * torch.square(torch.maximum(torch.zeros_like(y_pred), y_pred - 0.1))
     return torch.mean(torch.sum(L, 1))
