@@ -16,7 +16,7 @@ class EEGNet(nn.Module):
         super(EEGNet, self).__init__()
         """ PyTorch Implementation of EEGNet """
 
-        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
+        self.name = 'EEGNet'
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
         elif dropoutType == 'Dropout':
@@ -56,7 +56,7 @@ class EEGNet_ChanRed(nn.Module):
         super(EEGNet_ChanRed, self).__init__()
         """ PyTorch Implementation of Caps-EEGNet """
 
-        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
+        self.name = 'EEGNet'
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
         elif dropoutType == 'Dropout':
@@ -100,7 +100,7 @@ class EEGNet_WT(nn.Module):
         super(EEGNet_WT, self).__init__()
         """ PyTorch Implementation of EEGNet """
 
-        self.name = f'EEGNet-{F1},{D}_kernLength{kernLength}_dropout{dropoutRate}'
+        self.name = 'EEGNet'
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
         elif dropoutType == 'Dropout':
@@ -231,7 +231,7 @@ class CapsEEGNet(nn.Module):
         super(CapsEEGNet, self).__init__()
         """ PyTorch Implementation of Caps-EEGNet """
 
-        self.name = 'Caps-EEGNet'
+        self.name = 'CapsEEGNet'
         self.dropoutType = nn.Dropout
         
         self.block_1_2 = nn.Sequential(nn.Conv2d(1, 8, (1, 64), padding='same', bias=False),
@@ -358,7 +358,7 @@ class TCNet(nn.Module):
         super(TCNet, self).__init__()
         """ PyTorch Implementation of TC-Net """
 
-        self.name = 'TC-Net'
+        self.name = 'TCNet'
         
         d = 32
         self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4))
@@ -417,7 +417,7 @@ class MLFCapsNet(nn.Module):
         super(MLFCapsNet, self).__init__()
         """ PyTorch Implementation of MLF-CapsNet """
 
-        self.name = 'MLF-CapsNet'
+        self.name = 'MLFCapsNet'
         
         self.conv = nn.Conv2d(1, 256, 6, 2, padding='valid') #TODO: test it
         self.relu = nn.ReLU()

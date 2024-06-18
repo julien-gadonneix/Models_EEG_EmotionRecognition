@@ -160,8 +160,8 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
-            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None

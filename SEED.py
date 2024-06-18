@@ -60,7 +60,7 @@ names = ['Negative', 'Neutral', 'Positive']
 
 nb_classes = len(names)
 chans = 62
-best_innerChans = 18
+best_innerChans = 24
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
@@ -134,8 +134,8 @@ def train_SEED(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
-            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None

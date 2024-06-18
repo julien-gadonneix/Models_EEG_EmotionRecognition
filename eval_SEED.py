@@ -9,6 +9,7 @@ from pathlib import Path
 from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed
 from preprocess.preprocess_SEED import SEEDDataset
 from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss
+from sklearn.model_selection import KFold
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -36,7 +37,7 @@ best_batch_size = 128
 best_F1 = 64
 best_D = 8
 best_F2 = 64
-best_kernLength = 25 # perhaps go back to 100 for f_min = 2Hz
+best_kernLength = 15 # perhaps go back to 100 for f_min = 2Hz
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
@@ -47,7 +48,8 @@ selected_emotion = 'happiness(SEED)'
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 62
-best_innerChans = 18
+splits = KFold(n_splits=10, shuffle=True, random_state=42)
+best_innerChans = 24
 
 cur_dir = Path(__file__).resolve().parent
 figs_path = str(cur_dir) + '/figs/'
@@ -79,63 +81,58 @@ if dependent:
         dataset = SEEDDataset(sets_path+info_str, subjects=subject, sessions=None, samples=best_sample, start=best_start, save=save)
         dataset_size = len(dataset)
 
-        indices = list(range(dataset_size))
-        np.random.shuffle(indices)
-        split_test = int(np.floor(test_split * dataset_size))
-        train_indices, test_indices = indices[split_test:], indices[:split_test]
-
-        # Creating data samplers and loaders:
-        train_sampler = SubsetRandomSampler(train_indices)
-        test_sampler = SubsetRandomSampler(test_indices)
-        train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
-        test_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
-        print(len(train_indices), 'train samples')
-        print(len(test_indices), 'test samples')
+        for i, (train_idx, val_idx) in enumerate(splits.split(list(range(dataset_size)))):
+            print("Fold no.{}:".format(i + 1))
+            train_sampler = SubsetRandomSampler(train_idx)
+            valid_sampler = SubsetRandomSampler(val_idx)
+            train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
+            valid_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=valid_sampler, pin_memory=True)
+            print(len(train_idx), 'train samples')
+            print(len(val_idx), 'test samples')
 
 
-        ###############################################################################
-        # Model configurations
-        ###############################################################################
+            ###############################################################################
+            # Model configurations
+            ###############################################################################
 
-        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
-                               kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, norm_rate=best_norm_rate, nr=best_nr,
-                               dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+            model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                                kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2, norm_rate=best_norm_rate, nr=best_nr,
+                                dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
 
-        loss_fn = torch.nn.CrossEntropyLoss().to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
-        scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
+            loss_fn = torch.nn.CrossEntropyLoss().to(device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
-        torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.benchmark = True
 
 
-        ###############################################################################
-        # Train and test
-        ###############################################################################
+            ###############################################################################
+            # Train and test
+            ###############################################################################
 
-        losses_train = []
-        losses_test = []
-        for epoch in range(epochs_dep):
-            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
-            losses_train.append(loss)
-            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
-            losses_test.append(loss_test)
-            if epoch % 10 == 0:
-                print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
-        draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
+            losses_train = []
+            losses_test = []
+            for epoch in range(epochs_dep):
+                loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+                losses_train.append(loss)
+                acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok)
+                losses_test.append(loss_test)
+                if epoch % 10 == 0:
+                    print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
+            draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
-        with torch.no_grad():
-            for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
-                X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
-                if is_ok:
-                    with torch.autocast(device_type=device.type, dtype=torch.float16):
+            with torch.no_grad():
+                for batch_index, (X_batch, Y_batch) in enumerate(valid_loader):
+                    X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
+                    if is_ok:
+                        with torch.autocast(device_type=device.type, dtype=torch.float16):
+                            y_pred = model(X_batch)
+                    else:
                         y_pred = model(X_batch)
-                else:
-                    y_pred = model(X_batch)
-                _, predicted = torch.max(y_pred.data, 1)
-                preds.append(predicted.cpu().numpy())
-                # _, target = torch.max(Y_batch, 1)
-                target = Y_batch
-                Y_test.append(target.numpy())
+                    _, predicted = torch.max(y_pred.data, 1)
+                    preds.append(predicted.cpu().numpy())
+                    target = Y_batch
+                    Y_test.append(target.numpy())
 
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
@@ -199,8 +196,8 @@ if independent:
         ###############################################################################
 
         for epoch in range(epochs_ind):
-            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, 'EEGNet')
-            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, 'EEGNet')
+            loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
             if epoch % 1 == 0:
                 print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 

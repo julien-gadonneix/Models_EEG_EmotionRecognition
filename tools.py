@@ -11,11 +11,11 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import confusion_matrix
 
 
-def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model):
+def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
     model.train()
     avg_loss = 0
     for X_batch, Y_batch in train_loader:
-        if selected_model not in ['CapsEEGNet', 'TCNet']: # TODO: use model.name instead of selected_model
+        if model.name not in ['CapsEEGNet', 'TCNet']:
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         else:
             X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
@@ -27,9 +27,9 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, sele
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, Y_batch)
-        if selected_model in ['CapsEEGNet', 'TCNet']:
+        if model.name in ['CapsEEGNet', 'TCNet']:
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
-        if selected_model == 'MLFCapsNet':
+        if model.name == 'MLFCapsNet':
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
         avg_loss += loss.item()
         scaler.scale(loss).backward()
@@ -38,14 +38,14 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, sele
     return avg_loss / len(train_loader)
 
 
-def test_f(model, test_loader, loss_fn, device, is_ok, selected_model):
+def test_f(model, test_loader, loss_fn, device, is_ok):
     model.eval()
     correct = 0
     total = 0
     avg_loss = 0
     with torch.no_grad():
         for X_batch, Y_batch in test_loader:
-            if selected_model not in ['CapsEEGNet', 'TCNet']:
+            if model.name not in ['CapsEEGNet', 'TCNet']:
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
             else:
                 X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
@@ -56,7 +56,7 @@ def test_f(model, test_loader, loss_fn, device, is_ok, selected_model):
             else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, Y_batch)
-            if selected_model in ['CapsEEGNet', 'TCNet']:
+            if model.name in ['CapsEEGNet', 'TCNet']:
                 loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
             avg_loss += loss.item()
             _, predicted = torch.max(y_pred.data, 1)

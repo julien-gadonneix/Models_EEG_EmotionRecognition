@@ -148,9 +148,9 @@ for selected_emotion in emotions:
                 losses_train = []
                 losses_test = []
                 for epoch in range(epochs_dep_mix):
-                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
+                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
                     losses_train.append(loss)
-                    acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok, selected_model)
+                    acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok)
                     losses_test.append(loss_test)
                     if epoch % 10 == 0:
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
@@ -172,7 +172,7 @@ for selected_emotion in emotions:
                         target = Y_batch
                         Y_test.append(target.numpy())
 
-            classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
+        classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
 
     ###############################################################################
@@ -248,8 +248,8 @@ for selected_emotion in emotions:
                 ###############################################################################
 
                 for epoch in range(epochs_dep_ind):
-                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
-                    acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
+                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+                    acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
                     if epoch % 10 == 0:
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
@@ -344,8 +344,8 @@ for selected_emotion in emotions:
             ###############################################################################
 
             for epoch in range(epochs_ind):
-                loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, selected_model)
-                acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok, selected_model)
+                loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+                acc, loss_test = test_f(model, test_loader, loss_fn, device, is_ok)
                 if epoch % 1 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
