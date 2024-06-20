@@ -329,10 +329,12 @@ class SwinEncoder(nn.Module):
         x = rearrange(x_ln, 'b (h w) c -> b c h w', h=height, w=width)
         x = x_reshaped + self.WMSA(x)
         x = x + self.MLP(self.ln(x))
+
         x_ln = self.ln(x)
         x_reshaped =  rearrange(x_ln, 'b (h w) c -> b c h w', h=height, w=width)
         x = x + self.SWMSA(x_reshaped)
         x = x + self.MLP(self.ln(x))
+
         return x
 
 class PositionalEncoding(nn.Module):
@@ -371,7 +373,7 @@ class TCNet(nn.Module):
             # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
             # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
             # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
-            self.stages.append(SwinEncoder(d, 2, window_size=2))
+            self.stages.append(SwinEncoder(d, 1, window_size=2))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
                 d *= 2

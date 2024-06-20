@@ -27,7 +27,7 @@ best_sample = 200
 subjects = [[i] for i in range(15)]
 sessions = None
 
-epochs_dep = 150
+epochs_dep = 200
 epochs_ind = 20
 random_seed= 42
 test_split = .33
@@ -48,7 +48,7 @@ selected_emotion = 'happiness(SEED)'
 n_components = 2  # pick some components for xDawnRG
 nb_classes = len(names)
 chans = 62
-splits = KFold(n_splits=10, shuffle=True, random_state=42)
+splits = KFold(n_splits=10, shuffle=True, random_state=random_seed)
 best_innerChans = 24
 
 cur_dir = Path(__file__).resolve().parent
@@ -58,8 +58,8 @@ models_path = str(cur_dir) + '/tmp/'
 save = False
 
 np.random.seed(random_seed)
-dependent = False
-independent = True
+dependent = True
+independent = False
 
 
 ###############################################################################
@@ -70,6 +70,8 @@ if dependent:
     preds = []
     Y_test = []
     for subject in subjects:
+        preds_sub = []
+        Y_test_sub = []
 
         info_str = 'SEED_' + f'_subject({subject})_samples({best_sample})_start({best_start})_'
 
@@ -117,7 +119,7 @@ if dependent:
                 losses_train.append(loss)
                 acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok)
                 losses_test.append(loss_test)
-                if epoch % 10 == 0:
+                if epoch % 20 == 0:
                     print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
             draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
@@ -131,9 +133,12 @@ if dependent:
                         y_pred = model(X_batch)
                     _, predicted = torch.max(y_pred.data, 1)
                     preds.append(predicted.cpu().numpy())
+                    preds_sub.append(predicted.cpu().numpy())
                     target = Y_batch
                     Y_test.append(target.numpy())
+                    Y_test_sub.append(target.numpy())
 
+        classification_accuracy(np.concatenate(preds_sub), np.concatenate(Y_test_sub), names, figs_path, selected_emotion, f'dependent_sub({subject})')
     classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
 
