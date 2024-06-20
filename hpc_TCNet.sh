@@ -27,5 +27,10 @@
 #BSUB -o Output_%J.out 
 #BSUB -e Output_%J.err 
 
-source hpc_TCNet.sh
+
+module load python3/3.9.18
+module load numpy/1.26.2-python-3.9.18-openblas-0.3.25
+module load nvidiamodulusbase/pytorch-1.13.0-python-3.8.16
+
+
 python /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py
