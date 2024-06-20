@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 ###############################################################################
 
 emotions = ['arousal', 'dominance', 'valence']
-selected_model = 'TCNet'
+selected_model = 'EEGNet'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print('Using device:', device)
@@ -38,7 +38,7 @@ for selected_emotion in emotions:
     best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}} # {'freqs': np.arange(2, 50), 'output': 'power'}
     best_tfr = best_tfrs[selected_model]
 
-    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 1500} # TCNet should be 30
+    epochs_dep_mixs = {'EEGNet': 500, 'CapsEEGNet': 300, 'TCNet': 1500} # TCNet should be 30
     epochs_dep_mix = epochs_dep_mixs[selected_model]
     epochs_dep_ind = 800
     epochs_ind = 20
@@ -107,7 +107,7 @@ for selected_emotion in emotions:
             dataset_size = len(dataset)
 
             for i, (train_idx, val_idx) in enumerate(splits.split(list(range(dataset_size)))):
-                print("Fold no.{}:".format(i + 1))
+                print("Fold no.{}:".format(i+1))
                 train_sampler = SubsetRandomSampler(train_idx)
                 valid_sampler = SubsetRandomSampler(val_idx)
                 train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
