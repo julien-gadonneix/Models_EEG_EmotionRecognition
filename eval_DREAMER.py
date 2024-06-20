@@ -38,7 +38,7 @@ for selected_emotion in emotions:
     best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}} # {'freqs': np.arange(2, 50), 'output': 'power'}
     best_tfr = best_tfrs[selected_model]
 
-    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 1500} # TCNet should be 30
+    epochs_dep_mixs = {'EEGNet': 1000, 'CapsEEGNet': 300, 'TCNet': 3000} # TCNet should be 30
     epochs_dep_mix = epochs_dep_mixs[selected_model]
     epochs_dep_ind = 800
     epochs_ind = 20
@@ -69,7 +69,9 @@ for selected_emotion in emotions:
 
     n_components = 2  # pick some components for xDawnRG
     nb_classes = len(names)
-    splits = KFold(n_splits=10, shuffle=True, random_state=42)
+    random_seed = 42
+    splits = KFold(n_splits=10, shuffle=True, random_state=random_seed)
+    np.random.seed(random_seed)
     chans = 14
     if best_use_ecg:
         chans += 2
@@ -93,7 +95,8 @@ for selected_emotion in emotions:
         preds = []
         Y_test = []
         for subject in subjects:
-
+            preds_sub = []
+            Y_test_sub = []
             info_str = 'DREAMER_' + selected_emotion + f'_subject({subject})_session({sessions})_filtered({best_lowcut}, {best_highcut}, {best_order})_samples({best_sample})_start({best_start})_'
 
 
@@ -152,9 +155,12 @@ for selected_emotion in emotions:
                     losses_train.append(loss)
                     acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok)
                     losses_test.append(loss_test)
-                    if epoch % 10 == 0:
+                    if epoch % 50 == 0:
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
-                draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
+                if selected_model == 'TCNet':
+                    draw_loss(losses_train[500:], losses_test[500:], figs_path, selected_emotion, str(subject))
+                else:
+                    draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
                 with torch.no_grad():
                     for batch_index, (X_batch, Y_batch) in enumerate(valid_loader):
@@ -169,9 +175,12 @@ for selected_emotion in emotions:
                             y_pred = model(X_batch)
                         _, predicted = torch.max(y_pred.data, 1)
                         preds.append(predicted.cpu().numpy())
+                        preds_sub.append(predicted.cpu().numpy())
                         target = Y_batch
                         Y_test.append(target.numpy())
+                        Y_test_sub.append(target.numpy())
 
+            classification_accuracy(np.concatenate(preds_sub), np.concatenate(Y_test_sub), names, figs_path, selected_emotion, f'dependent_sub({subject})')
         classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'dependent')
 
 
