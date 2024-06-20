@@ -10,8 +10,13 @@ __pycache__
 # Ignore logs
 nohup.out
 logs/
+*.out
+*.err
 
 # Ignore results
 tmp/
 sets/
 figs/losses/
+
+# Ignore virtualenv
+myenv/

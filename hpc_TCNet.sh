@@ -1,11 +1,13 @@
 #!/bin/sh 
 ### General options 
 ### -- specify queue -- 
-#BSUB -q hpc
+#BSUB -q gpuv100
 ### -- set the job Name -- 
-#BSUB -J TCNet
+#BSUB -J TCNet2
 ### -- ask for number of cores (default: 1) -- 
-#BSUB -n 1
+#BSUB -n 4
+### -- Select the resources: 1 gpu in exclusive process mode --
+#BSUB -gpu "num=1:mode=exclusive_process"
 ### -- specify that the cores must be on the same host -- 
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need 4GB of memory per core/slot -- 
@@ -28,9 +30,7 @@
 #BSUB -e Output_%J.err 
 
 
-module load python3/3.9.18
-module load numpy/1.26.2-python-3.9.18-openblas-0.3.25
-module load nvidiamodulusbase/pytorch-1.13.0-python-3.8.16
+source /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/myenv/bin/activate
 
 
-python /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py
+python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py TCNet
