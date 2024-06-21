@@ -2,6 +2,9 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+import os
+import torch.distributed as dist
+import torch.multiprocessing as mp
 
 from pyriemann.estimation import XdawnCovariances
 from pyriemann.tangentspace import TangentSpace
@@ -11,14 +14,21 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import confusion_matrix
 
 
-def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
+MODEL_CHOICES = ["EEGNet", "CapsEEGNet", "TCNet"]
+
+
+def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1=None):
     model.train()
     avg_loss = 0
     for X_batch, Y_batch in train_loader:
         if model.name not in ['CapsEEGNet', 'TCNet']:
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         else:
-            X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
+            X_batch = X_batch.to(device)
+            if model.name == 'TCNet':
+                Y_batch = Y_batch.to(dev1)
+            else:
+                Y_batch = Y_batch.to(device)
         optimizer.zero_grad(set_to_none=True)
         if is_ok:
             with torch.autocast(device_type=device.type, dtype=torch.float16):
@@ -38,7 +48,7 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
     return avg_loss / len(train_loader)
 
 
-def test_f(model, test_loader, loss_fn, device, is_ok):
+def test_f(model, test_loader, loss_fn, device, is_ok, dev1=None):
     model.eval()
     correct = 0
     total = 0
@@ -48,7 +58,11 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
             if model.name not in ['CapsEEGNet', 'TCNet']:
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
             else:
-                X_batch, Y_batch = X_batch.to(device=device), Y_batch.to(device)
+                X_batch = X_batch.to(device)
+                if model.name == 'TCNet':
+                    Y_batch.to(dev1)
+                else:
+                    Y_batch.to(device)
             if is_ok:
                 with torch.autocast(device_type=device.type, dtype=torch.float16):
                     y_pred = model(X_batch)
@@ -69,7 +83,7 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
 def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, mode):
     acc = np.mean(preds == Y_test)
     print("Subject-" + mode + " classification accuracy on " + selected_emotion + ": %f " % (acc))
-    ConfusionMatrixDisplay(confusion_matrix(preds, Y_test), display_labels=names).plot()
+    ConfusionMatrixDisplay(confusion_matrix(preds, Y_test, labels=np.arange(len(names))), display_labels=names).plot()
     plt.title("Subject-" + mode + " classification accuracy on " + selected_emotion, fontsize=10)
     plt.xlabel("Predicted \n Classification accuracy: %.4f " % (acc))
     plt.tight_layout()
@@ -117,3 +131,23 @@ def margin_loss(y_pred, y_true):
     y_true = F.one_hot(y_true, num_classes=y_pred.shape[1])
     L = y_true * torch.square(torch.maximum(torch.zeros_like(y_pred), 0.9 - y_pred)) + 0.5 * (1 - y_true) * torch.square(torch.maximum(torch.zeros_like(y_pred), y_pred - 0.1))
     return torch.mean(torch.sum(L, 1))
+
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'  # Adjust based on available GPUs
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+
+def cleanup():
+    dist.destroy_process_group()
+
+
+def run_fn(demo_fn, world_size, args):
+    mp.spawn(demo_fn,
+             args=(world_size, args),
+             nprocs=world_size,
+             join=True)

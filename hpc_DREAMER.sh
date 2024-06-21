@@ -3,7 +3,7 @@
 ### -- specify queue -- 
 #BSUB -q gpuv100
 ### -- set the job Name -- 
-#BSUB -J TCNet2
+#BSUB -J DREAMER
 ### -- ask for number of cores (default: 1) -- 
 #BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -15,7 +15,7 @@
 ### -- specify that we want the job to get killed if it exceeds 5 GB per core/slot -- 
 #BSUB -M 5GB
 ### -- set walltime limit: hh:mm -- 
-#BSUB -W 24:00 
+#BSUB -W 72:00 
 ### -- set the email address -- 
 # please uncomment the following line and put in your e-mail address,
 # if you want to receive e-mail notifications on a non-default address
@@ -33,4 +33,4 @@
 source /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/myenv/bin/activate
 
 
-python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py TCNet
+python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py EEGNet
