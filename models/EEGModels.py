@@ -167,14 +167,13 @@ class EmotionCap(nn.Module):
         self.routings = routings
         self.input_num_capsule = input_num_capsule
         self.input_dim_capsule = input_dim_capsule
-        self.dev = dev
         self.W = nn.Parameter(nn.init.xavier_uniform_(torch.zeros(self.num_capsule, self.input_num_capsule, self.dim_capsule, self.input_dim_capsule, device=dev)))
 
     def forward(self, x):
         u_expand = torch.unsqueeze(x, 1)
         u_tiled = torch.tile(u_expand, (1, self.num_capsule, 1, 1))
         u_hat = torch.matmul(self.W, u_tiled.unsqueeze(-1)).squeeze(-1)
-        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule), device=self.dev))
+        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule), device=x.device))
         for i in range(self.routings):
             c = F.softmax(b, dim=1)
             s = torch.matmul(c, u_hat)
@@ -268,7 +267,6 @@ class ShiftedWindowMSA(nn.Module):
         super().__init__()
         self.emb_size = emb_size
         self.num_heads = num_heads
-        self.dev = dev
         self.window_size = window_size
         self.shifted = shifted
         self.linear1 = nn.Linear(emb_size, 3*emb_size, device=dev)
@@ -293,7 +291,7 @@ class ShiftedWindowMSA(nn.Module):
         rel_pos_embedding = self.pos_embeddings[self.relative_indices[:, :, 0], self.relative_indices[:, :, 1]]
         wei += rel_pos_embedding
         if self.shifted:
-            row_mask = torch.zeros((self.window_size**2, self.window_size**2), device=self.dev)
+            row_mask = torch.zeros((self.window_size**2, self.window_size**2), device=x.device)
             row_mask[-self.window_size * (self.window_size//2):, 0:-self.window_size * (self.window_size//2)] = float('-inf')
             row_mask[0:-self.window_size * (self.window_size//2), -self.window_size * (self.window_size//2):] = float('-inf')
             column_mask = rearrange(row_mask, '(r w1) (c w2) -> (w1 r) (w2 c)', w1=self.window_size, w2=self.window_size)

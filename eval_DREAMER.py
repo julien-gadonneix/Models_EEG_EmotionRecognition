@@ -97,7 +97,6 @@ def eval_DREAMER(rank, world_size, args, mp=True):
         cur_dir = Path(__file__).resolve().parent
         figs_path = str(cur_dir) + '/figs/'
         sets_path = str(cur_dir) + '/sets/'
-        models_path = str(cur_dir) + '/tmp/'
         save = False
 
         dep_mix = True
@@ -188,7 +187,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                         draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
                     with torch.no_grad():
-                        for batch_index, (X_batch, Y_batch) in enumerate(valid_loader):
+                        for _, (X_batch, Y_batch) in enumerate(valid_loader):
                             if selected_model not in ['CapsEEGNet', 'TCNet']:
                                 X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                             else:

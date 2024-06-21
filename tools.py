@@ -25,7 +25,7 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         else:
             X_batch = X_batch.to(device)
-            if model.name == 'TCNet':
+            if model.name == 'TCNet' and dev1 is not None:
                 Y_batch = Y_batch.to(dev1)
             else:
                 Y_batch = Y_batch.to(device)
@@ -59,10 +59,10 @@ def test_f(model, test_loader, loss_fn, device, is_ok, dev1=None):
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
             else:
                 X_batch = X_batch.to(device)
-                if model.name == 'TCNet':
-                    Y_batch.to(dev1)
+                if model.name == 'TCNet' and dev1 is not None:
+                    Y_batch = Y_batch.to(dev1)
                 else:
-                    Y_batch.to(device)
+                    Y_batch = Y_batch.to(device)
             if is_ok:
                 with torch.autocast(device_type=device.type, dtype=torch.float16):
                     y_pred = model(X_batch)
@@ -129,7 +129,8 @@ def xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, 
 
 def margin_loss(y_pred, y_true):
     y_true = F.one_hot(y_true, num_classes=y_pred.shape[1])
-    L = y_true * torch.square(torch.maximum(torch.zeros_like(y_pred), 0.9 - y_pred)) + 0.5 * (1 - y_true) * torch.square(torch.maximum(torch.zeros_like(y_pred), y_pred - 0.1))
+    L = y_true * torch.square(torch.maximum(torch.zeros_like(y_pred, device=y_pred.device), 0.9 - y_pred)) + \
+        0.5 * (1 - y_true) * torch.square(torch.maximum(torch.zeros_like(y_pred, device=y_pred.device), y_pred - 0.1))
     return torch.mean(torch.sum(L, 1))
 
 
