@@ -148,7 +148,7 @@ class PrimaryCap(nn.Module):
         self.dim_capsule = dim_capsule
         self.caps = nn.Conv2d(inputs, dim_capsule*n_channels, kernel_size=kernel_size, stride=strides, padding=padding)
         if model_version == 'v2':
-            self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, 256, kernel_size=1, stride=1, padding='valid')
+            self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, dim_capsule*n_channels, kernel_size=1, stride=1, padding='valid')
     
     def forward(self, x):
         out = self.caps(x)
@@ -245,7 +245,7 @@ class CapsEEGNet(nn.Module):
 
         # self.primaryCaps = PrimaryCaps(num_capsules=8, in_channels=8*2, out_channels=32, kernel_size=(1, 6), num_routes=32*1*60)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=32*1*60, in_channels=8, out_channels=16)
-        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v2') # ReLU activation after the convolutional layer not present but residual present
+        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v0') # ReLU activation after the convolutional layer not present
         self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8)
         self.fc = nn.Linear(16, 1)
     
@@ -383,7 +383,7 @@ class TCNet(nn.Module):
         self.PatchMerging = nn.ModuleList(self.PatchMerging)
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
-        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v0')
+        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2')
         self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8)
 
 
