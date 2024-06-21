@@ -142,13 +142,13 @@ def squash(input_tensor, epsilon=1e-7):
     return output_tensor
 
 class PrimaryCap(nn.Module):
-    def __init__(self, inputs, dim_capsule, n_channels, kernel_size, strides, padding, model_version):
+    def __init__(self, inputs, dim_capsule, n_channels, kernel_size, strides, padding, model_version, dev):
         super(PrimaryCap, self).__init__()
         self.model_version = model_version
         self.dim_capsule = dim_capsule
-        self.caps = nn.Conv2d(inputs, dim_capsule*n_channels, kernel_size=kernel_size, stride=strides, padding=padding)
+        self.caps = nn.Conv2d(inputs, dim_capsule*n_channels, kernel_size=kernel_size, stride=strides, padding=padding, device=dev)
         if model_version == 'v2':
-            self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, dim_capsule*n_channels, kernel_size=1, stride=1, padding='valid')
+            self.caps2 = nn.Conv2d((dim_capsule*n_channels)+inputs, dim_capsule*n_channels, kernel_size=1, stride=1, padding='valid', device=dev)
     
     def forward(self, x):
         out = self.caps(x)
@@ -160,20 +160,21 @@ class PrimaryCap(nn.Module):
         return squash(out)
 
 class EmotionCap(nn.Module):
-    def __init__(self, num_capsule, dim_capsule, routings, input_num_capsule, input_dim_capsule):
+    def __init__(self, num_capsule, dim_capsule, routings, input_num_capsule, input_dim_capsule, dev):
         super(EmotionCap, self).__init__()
         self.num_capsule = num_capsule
         self.dim_capsule = dim_capsule
         self.routings = routings
         self.input_num_capsule = input_num_capsule
         self.input_dim_capsule = input_dim_capsule
-        self.W = nn.Parameter(nn.init.xavier_uniform_(torch.zeros(self.num_capsule, self.input_num_capsule, self.dim_capsule, self.input_dim_capsule)))
+        self.dev = dev
+        self.W = nn.Parameter(nn.init.xavier_uniform_(torch.zeros(self.num_capsule, self.input_num_capsule, self.dim_capsule, self.input_dim_capsule, device=dev)))
 
     def forward(self, x):
         u_expand = torch.unsqueeze(x, 1)
         u_tiled = torch.tile(u_expand, (1, self.num_capsule, 1, 1))
         u_hat = torch.matmul(self.W, u_tiled.unsqueeze(-1)).squeeze(-1)
-        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule))).to(x.device)
+        b = Variable(torch.zeros((u_hat.shape[0], self.num_capsule, 1, self.input_num_capsule), device=self.dev))
         for i in range(self.routings):
             c = F.softmax(b, dim=1)
             s = torch.matmul(c, u_hat)
@@ -245,8 +246,8 @@ class CapsEEGNet(nn.Module):
 
         # self.primaryCaps = PrimaryCaps(num_capsules=8, in_channels=8*2, out_channels=32, kernel_size=(1, 6), num_routes=32*1*60)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=32*1*60, in_channels=8, out_channels=16)
-        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v0') # ReLU activation after the convolutional layer not present
-        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8)
+        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v0', None) # ReLU activation after the convolutional layer not present
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8, None)
         self.fc = nn.Linear(16, 1)
     
 
@@ -263,16 +264,17 @@ class CapsEEGNet(nn.Module):
 
 # need these for TCNet
 class ShiftedWindowMSA(nn.Module):
-    def __init__(self, emb_size, num_heads, window_size=2, shifted=True):
+    def __init__(self, emb_size, num_heads, dev, window_size=2, shifted=True):
         super().__init__()
         self.emb_size = emb_size
         self.num_heads = num_heads
+        self.dev = dev
         self.window_size = window_size
         self.shifted = shifted
-        self.linear1 = nn.Linear(emb_size, 3*emb_size)
-        self.linear2 = nn.Linear(emb_size, emb_size)
-        self.pos_embeddings = nn.Parameter(torch.randn(window_size*2 - 1, window_size*2 - 1))
-        self.indices = torch.tensor(np.array([[x, y] for x in range(window_size) for y in range(window_size)]))
+        self.linear1 = nn.Linear(emb_size, 3*emb_size, device=dev)
+        self.linear2 = nn.Linear(emb_size, emb_size, device=dev)
+        self.pos_embeddings = nn.Parameter(torch.randn(window_size*2 - 1, window_size*2 - 1, device=dev))
+        self.indices = torch.tensor(np.array([[x, y] for x in range(window_size) for y in range(window_size)]), device=dev)
         self.relative_indices = self.indices[None, :, :] - self.indices[:, None, :]
         self.relative_indices += self.window_size - 1
 
@@ -291,7 +293,7 @@ class ShiftedWindowMSA(nn.Module):
         rel_pos_embedding = self.pos_embeddings[self.relative_indices[:, :, 0], self.relative_indices[:, :, 1]]
         wei += rel_pos_embedding
         if self.shifted:
-            row_mask = torch.zeros((self.window_size**2, self.window_size**2)).to(x.device)
+            row_mask = torch.zeros((self.window_size**2, self.window_size**2), device=self.dev)
             row_mask[-self.window_size * (self.window_size//2):, 0:-self.window_size * (self.window_size//2)] = float('-inf')
             row_mask[0:-self.window_size * (self.window_size//2), -self.window_size * (self.window_size//2):] = float('-inf')
             column_mask = rearrange(row_mask, '(r w1) (c w2) -> (w1 r) (w2 c)', w1=self.window_size, w2=self.window_size)
@@ -303,24 +305,24 @@ class ShiftedWindowMSA(nn.Module):
         return self.linear2(x)
     
 class MLP(nn.Module):
-    def __init__(self, emb_size):
+    def __init__(self, emb_size, dev):
         super().__init__()
         self.ff = nn.Sequential(
-                         nn.Linear(emb_size, 4*emb_size),
+                         nn.Linear(emb_size, 4*emb_size, device=dev),
                          nn.GELU(),
-                         nn.Linear(4*emb_size, emb_size)
+                         nn.Linear(4*emb_size, emb_size, device=dev)
                   )
     
     def forward(self, x):
         return self.ff(x)
     
 class SwinEncoder(nn.Module):
-    def __init__(self, emb_size, num_heads, window_size=2):
+    def __init__(self, emb_size, num_heads, dev, window_size=2):
         super().__init__()
-        self.WMSA = ShiftedWindowMSA(emb_size, num_heads, window_size, shifted=False)
-        self.SWMSA = ShiftedWindowMSA(emb_size, num_heads, window_size, shifted=True)
-        self.ln = nn.LayerNorm(emb_size)
-        self.MLP = MLP(emb_size)
+        self.WMSA = ShiftedWindowMSA(emb_size, num_heads, dev, window_size, shifted=False)
+        self.SWMSA = ShiftedWindowMSA(emb_size, num_heads, dev, window_size, shifted=True)
+        self.ln = nn.LayerNorm(emb_size, device=dev)
+        self.MLP = MLP(emb_size, dev)
         
     def forward(self, x):
         _, _, height, width = x.shape
@@ -356,14 +358,16 @@ class PositionalEncoding(nn.Module):
 
 
 class TCNet(nn.Module):
-    def __init__(self, nb_classes, device, Chans):
+    def __init__(self, nb_classes, Chans, dev0=None, dev1=None):
         super(TCNet, self).__init__()
         """ PyTorch Implementation of TC-Net """
 
         self.name = 'TCNet'
+        self.dev0 = dev0
+        self.dev1 = dev1
         
         d = 32
-        self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4))
+        self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4), device=dev0)
         # self.EEG_Transformer = []
         # self.PositionalEncoding = []
         self.stages = []
@@ -373,9 +377,9 @@ class TCNet(nn.Module):
             # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
             # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
             # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
-            self.stages.append(SwinEncoder(d, 1, window_size=2))
+            self.stages.append(SwinEncoder(d, 1, dev0, window_size=2))
             if i < 3:
-                self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=device))
+                self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=dev0))
                 d *= 2
         # self.PositionalEncoding = nn.ModuleList(self.PositionalEncoding)
         # self.EEG_Transformer = nn.ModuleList(self.EEG_Transformer)
@@ -383,8 +387,8 @@ class TCNet(nn.Module):
         self.PatchMerging = nn.ModuleList(self.PatchMerging)
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
-        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2')
-        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8)
+        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2', dev1)
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8, dev1)
 
 
     def generate_square_subsequent_mask(self, sz):
@@ -408,6 +412,8 @@ class TCNet(nn.Module):
             # x = x.reshape(bs, fs*(2**i), hs//(2**i), ws//(2**i))
             if i < len(self.PatchMerging):
                 x = self.PatchMerging[i](x)
+        if self.dev1 is not None:
+            x = x.to(self.dev1)
         x = self.primaryCaps(x)
         x = self.emotionCaps(x)
         return torch.norm(x, dim=2).squeeze()
