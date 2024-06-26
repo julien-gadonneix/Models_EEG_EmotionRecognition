@@ -7,7 +7,7 @@ import torch
 from pathlib import Path
 import argparse
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed
+from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed, EEGNet_WT
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, margin_loss, cleanup, setup, run_fn, MODEL_CHOICES
 from sklearn.model_selection import KFold
@@ -51,9 +51,10 @@ def eval_DREAMER(rank, world_size, args, mp=True):
         best_type = 'butter'
         best_start = 1
         best_sample = 128
+        best_std = True
         subjects = [[i] for i in range(23)]
         sessions = [[i] for i in range(18)]
-        best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}} # {'freqs': np.arange(2, 50), 'output': 'power'}
+        best_tfrs = {'EEGNet': 2, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}} # {'freqs': np.arange(2, 50), 'output': 'power'}
         best_tfr = best_tfrs[selected_model]
 
         epochs_dep_mixs = {'EEGNet': 500, 'CapsEEGNet': 300, 'TCNet': 5000} # TCNet should be 30
@@ -123,7 +124,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
 
                 dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
                                         lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes,
-                                        tfr=best_tfr, use_ecg=best_use_ecg)
+                                        tfr=best_tfr, use_ecg=best_use_ecg, std=best_std)
                 dataset_size = len(dataset)
 
                 for i, (train_idx, val_idx) in enumerate(splits.split(list(range(dataset_size)))):
@@ -143,9 +144,9 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                     if selected_model == 'CapsEEGNet':
                         model = CapsEEGNet(nb_classes, chans).to(device=device)
                     elif selected_model == 'EEGNet':
-                        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                        model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
                                             kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(device=device, memory_format=torch.channels_last)
                     elif selected_model == 'TCNet':
                         if mp:
                             model = TCNet(nb_classes, chans, dev0, dev1)
@@ -230,10 +231,10 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                     sess_test = sess
                     dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subject, sessions=sess_train, samples=best_sample, start=best_start,
                                             lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes,
-                                            tfr=best_tfr, use_ecg=best_use_ecg)
+                                            tfr=best_tfr, use_ecg=best_use_ecg, std=best_std)
                     dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subject, sessions=sess_test, samples=best_sample, start=best_start,
                                             lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes,
-                                            tfr=best_tfr, use_ecg=best_use_ecg)
+                                            tfr=best_tfr, use_ecg=best_use_ecg, std=best_std)
                     dataset_train_size = len(dataset_train)
                     dataset_test_size = len(dataset_test)
 
@@ -258,9 +259,9 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                     if selected_model == 'CapsEEGNet':
                         model = CapsEEGNet(nb_classes, chans).to(device=device)
                     elif selected_model == 'EEGNet':
-                        model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                        model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
                                             kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(device=device, memory_format=torch.channels_last)
                     elif selected_model == 'TCNet':
                         model = TCNet(nb_classes, chans).to(device=device)
                     else:
@@ -326,10 +327,10 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                 subjects_test = subject
                 dataset_train = DREAMERDataset(sets_path+info_str_train, selected_emotion, subjects=subjects_train, samples=best_sample, start=best_start,
                                         lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes,
-                                        tfr=best_tfr, use_ecg=best_use_ecg)
+                                        tfr=best_tfr, use_ecg=best_use_ecg, std=best_std)
                 dataset_test = DREAMERDataset(sets_path+info_str_test, selected_emotion, subjects=subjects_test, samples=best_sample, start=best_start,
                                         lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes,
-                                        tfr=best_tfr, use_ecg=best_use_ecg)
+                                        tfr=best_tfr, use_ecg=best_use_ecg, std=best_std)
                 dataset_train_size = len(dataset_train)
                 dataset_test_size = len(dataset_test)
 
@@ -354,9 +355,9 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                 if selected_model == 'CapsEEGNet':
                     model = CapsEEGNet(nb_classes, chans).to(device=device)
                 elif selected_model == 'EEGNet':
-                    model = EEGNet_ChanRed(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                    model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
                                         kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                        norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
+                                        norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(device=device, memory_format=torch.channels_last)
                 elif selected_model == 'TCNet':
                     model = TCNet(nb_classes, chans).to(device=device)
                 else:

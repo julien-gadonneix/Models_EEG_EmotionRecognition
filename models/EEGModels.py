@@ -95,12 +95,14 @@ class EEGNet_ChanRed(nn.Module):
 
 
 class EEGNet_WT(nn.Module):
-    def __init__(self, nb_classes, Chans=64, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
+    def __init__(self, nb_classes, Chans=64, InnerChans=14, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
                  D=2, F2=16, norm_rate=0.25, nr=1., dropoutType='Dropout', nb_freqs=48):
         super(EEGNet_WT, self).__init__()
-        """ PyTorch Implementation of EEGNet """
+        """ PyTorch Implementation of EEGNet zith wavelt transform as input """
 
         self.name = 'EEGNet'
+        self.nb_freqs = nb_freqs
+        self.InnerChans = InnerChans
         if dropoutType == 'SpatialDropout2D':
             self.dropoutType = nn.Dropout2d
         elif dropoutType == 'Dropout':
@@ -109,9 +111,12 @@ class EEGNet_WT(nn.Module):
             raise ValueError('dropoutType must be one of SpatialDropout2D '
                             'or Dropout, passed as a string.')
         
-        self.block1 = nn.Sequential(nn.Conv2d(nb_freqs, F1, (1, kernLength), padding='same', bias=False),
+        self.chan_reduction = nn.Conv2d(nb_freqs, nb_freqs*InnerChans, (Chans, 1), groups=nb_freqs, padding='valid')
+        in_ch = nb_freqs
+        
+        self.block1 = nn.Sequential(nn.Conv2d(in_ch, F1, (1, kernLength), padding='same', bias=False),
                                     nn.BatchNorm2d(F1),
-                                    ConstrainedConv2d(F1, F1*D, (Chans, 1), bias=False, groups=F1, padding='valid', nr=nr),
+                                    ConstrainedConv2d(F1, F1*D, (InnerChans, 1), bias=False, groups=F1, padding='valid', nr=nr),
                                     nn.BatchNorm2d(D*F1),
                                     nn.ELU(),
                                     nn.AvgPool2d((1, 4)),
@@ -126,7 +131,10 @@ class EEGNet_WT(nn.Module):
     
 
     def forward(self, x):
-        x = torch.permute(x, (0, 2, 1, 3))
+        if self.nb_freqs > 1:
+            x = torch.permute(x, (0, 2, 1, 3))
+        x = self.chan_reduction(x)
+        x = x.view(x.shape[0], self.nb_freqs, self.InnerChans, x.shape[3])
         x = self.block1(x)
         x = self.block2(x)
         x = self.flatten(x)
@@ -142,6 +150,11 @@ def squash(input_tensor, epsilon=1e-7):
     return output_tensor
 
 class PrimaryCap(nn.Module):
+    '''
+    v0: no concatenation: performs poorly
+    v1: concatenate with input: difficult ot use because of the different dimensions
+    v2: concatenate with input and apply 1x1 convolution: performs well
+    '''
     def __init__(self, inputs, dim_capsule, n_channels, kernel_size, strides, padding, model_version, dev):
         super(PrimaryCap, self).__init__()
         self.model_version = model_version
@@ -245,7 +258,7 @@ class CapsEEGNet(nn.Module):
 
         # self.primaryCaps = PrimaryCaps(num_capsules=8, in_channels=8*2, out_channels=32, kernel_size=(1, 6), num_routes=32*1*60)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=32*1*60, in_channels=8, out_channels=16)
-        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v0', None) # ReLU activation after the convolutional layer not present
+        self.primaryCaps = PrimaryCap(8*2, 8, 32, (1, 6), 1, 'same', 'v2', None) # ReLU activation after the convolutional layer not present + residual
         self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8, None)
         self.fc = nn.Linear(16, 1)
     
