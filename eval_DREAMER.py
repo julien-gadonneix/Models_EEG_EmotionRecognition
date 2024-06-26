@@ -56,7 +56,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
         best_tfrs = {'EEGNet': None, 'CapsEEGNet': None, 'TCNet': {'freqs': np.arange(2, 50), 'output': 'power'}} # {'freqs': np.arange(2, 50), 'output': 'power'}
         best_tfr = best_tfrs[selected_model]
 
-        epochs_dep_mixs = {'EEGNet': 500, 'CapsEEGNet': 300, 'TCNet': 3000} # TCNet should be 30
+        epochs_dep_mixs = {'EEGNet': 500, 'CapsEEGNet': 300, 'TCNet': 5000} # TCNet should be 30
         epochs_dep_mix = epochs_dep_mixs[selected_model]
         epochs_dep_ind = 800
         epochs_ind = 20
