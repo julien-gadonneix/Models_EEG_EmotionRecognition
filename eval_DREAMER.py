@@ -41,7 +41,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
     selected_model = args.model
 
     print('Using device:', device)
-    is_ok = device.type != 'mps' and selected_model != 'TCNet' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
+    is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
 
     for selected_emotion in emotions:
         best_use_ecg = False

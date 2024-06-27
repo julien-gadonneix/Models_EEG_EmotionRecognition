@@ -1,7 +1,7 @@
 #!/bin/sh 
 ### General options 
 ### -- specify queue -- 
-#BSUB -q gpuv100
+#BSUB -q gpua100
 ### -- set the job Name -- 
 #BSUB -J DREAMER
 ### -- ask for number of cores (default: 1) -- 
@@ -33,4 +33,4 @@
 source /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/myenv/bin/activate
 
 
-python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py EEGNet
+python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py TCNet
