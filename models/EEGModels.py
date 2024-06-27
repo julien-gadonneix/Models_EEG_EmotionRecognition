@@ -112,9 +112,8 @@ class EEGNet_WT(nn.Module):
                             'or Dropout, passed as a string.')
         
         self.chan_reduction = nn.Conv2d(nb_freqs, nb_freqs*InnerChans, (Chans, 1), groups=nb_freqs, padding='valid')
-        in_ch = nb_freqs
         
-        self.block1 = nn.Sequential(nn.Conv2d(in_ch, F1, (1, kernLength), padding='same', bias=False),
+        self.block1 = nn.Sequential(nn.Conv2d(nb_freqs, F1, (1, kernLength), padding='same', bias=False),
                                     nn.BatchNorm2d(F1),
                                     ConstrainedConv2d(F1, F1*D, (InnerChans, 1), bias=False, groups=F1, padding='valid', nr=nr),
                                     nn.BatchNorm2d(D*F1),
@@ -379,10 +378,10 @@ class TCNet(nn.Module):
         
         d = 32
         self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4), device=dev0)
-        # self.EEG_Transformer = []
-        # self.PositionalEncoding = []
-        self.stages = []
-        self.PatchMerging = []
+        # self.EEG_Transformer = nn.ModuleList()
+        # self.PositionalEncoding = nn.ModuleList()
+        self.stages = nn.ModuleList()
+        self.PatchMerging = nn.ModuleList()
         for i in range(4):
             # self.PositionalEncoding.append(PositionalEncoding(d*4, max_len=int(128/(4**i))))
             # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
@@ -392,23 +391,71 @@ class TCNet(nn.Module):
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=dev0))
                 d *= 2
-        # self.PositionalEncoding = nn.ModuleList(self.PositionalEncoding)
-        # self.EEG_Transformer = nn.ModuleList(self.EEG_Transformer)
-        self.stages = nn.ModuleList(self.stages)
-        self.PatchMerging = nn.ModuleList(self.PatchMerging)
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
         self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2', dev1)
         self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8, dev1)
-
-
-    def generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
     
 
     def forward(self, x):
+        x = self.PatchPartition(x)
+        # bs, fs, hs, ws = x.shape
+        for i in range(len(self.stages)):
+            _, _, height, width = x.shape
+            # x = x.view(bs, fs*(2**i)*4, -1)
+            # x = x.permute(0, 2, 1)
+            # x = self.PositionalEncoding[i](x) * math.sqrt(fs*(2**i)*4)
+            # x = self.EEG_Transformer[i](x)
+            x = self.stages[i](x)
+            x = rearrange(x, 'b (h w) c -> b c h w', h=height, w=width)
+            # x = x.permute(0, 2, 1)
+            # x = x.reshape(bs, fs*(2**i), hs//(2**i), ws//(2**i))
+            if i < len(self.PatchMerging):
+                x = self.PatchMerging[i](x)
+        if self.dev1 is not None:
+            x = x.to(self.dev1)
+        x = self.primaryCaps(x)
+        x = self.emotionCaps(x)
+        return torch.norm(x, dim=2).squeeze()
+
+
+
+class TCNet_EMD(nn.Module):
+    def __init__(self, nb_classes, Chans, nb_freqs, kern_emd, dev0=None, dev1=None):
+        super(TCNet_EMD, self).__init__()
+        """ PyTorch Implementation of TC-Net """
+
+        self.name = 'TCNet'
+        self.dev0 = dev0
+        self.dev1 = dev1
+
+        self.emd_expansion = nn.Conv2d(nb_freqs+1, 48, (1, kern_emd), padding='same', device=dev0)
+        
+        d = 32
+        self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4), device=dev0)
+        # self.EEG_Transformer = nn.ModuleList()
+        # self.PositionalEncoding = nn.ModuleList()
+        self.stages = nn.ModuleList()
+        self.PatchMerging = nn.ModuleList()
+        for i in range(4):
+            # self.PositionalEncoding.append(PositionalEncoding(d*4, max_len=int(128/(4**i))))
+            # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
+            # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
+            # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
+            self.stages.append(SwinEncoder(d, 1, dev0, window_size=2))
+            if i < 3:
+                self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=dev0))
+                d *= 2
+        # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
+        # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
+        self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2', dev1)
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8, dev1)
+    
+
+    def forward(self, x):
+        x = torch.permute(x, (0, 2, 1, 3))
+        x = self.emd_expansion(x)
+        x = torch.permute(x, (0, 2, 1, 3))
         x = self.PatchPartition(x)
         # bs, fs, hs, ws = x.shape
         for i in range(len(self.stages)):
