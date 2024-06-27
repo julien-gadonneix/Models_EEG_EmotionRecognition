@@ -188,7 +188,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                         draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
                     with torch.no_grad():
-                        for _, (X_batch, Y_batch) in enumerate(valid_loader):
+                        for X_batch, Y_batch in valid_loader:
                             if selected_model not in ['CapsEEGNet', 'TCNet']:
                                 X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                             else:
@@ -288,7 +288,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                             print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
                     with torch.no_grad():
-                        for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                        for X_batch, Y_batch in test_loader:
                             if selected_model not in ['CapsEEGNet', 'TCNet']:
                                 X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                             else:
@@ -384,7 +384,7 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
 
                 with torch.no_grad():
-                    for batch_index, (X_batch, Y_batch) in enumerate(test_loader):
+                    for X_batch, Y_batch in test_loader:
                         if selected_model not in ['CapsEEGNet', 'TCNet']:
                             X_batch = X_batch.to(device=device, memory_format=torch.channels_last)
                         else:

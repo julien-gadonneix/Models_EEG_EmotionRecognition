@@ -105,10 +105,10 @@ class DREAMERDataset(Dataset):
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
                             imfs = []
-                            for i in range(stimulis_j.shape[0]):
+                            for i_emd in range(stimulis_j.shape[0]):
                                 imfs_ch = []
-                                for j in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i, j], max_imf=tfr)
+                                for j_emd in range(stimulis_j.shape[1]):
+                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
                                     if imf.shape[0] != tfr+1:
                                         imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
                                     imfs_ch.append(imf)
@@ -159,10 +159,10 @@ class DREAMERDataset(Dataset):
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
                             imfs = []
-                            for i in range(stimulis_j.shape[0]):
+                            for i_emd in range(stimulis_j.shape[0]):
                                 imfs_ch = []
-                                for j in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i, j], max_imf=tfr)
+                                for j_emd in range(stimulis_j.shape[1]):
+                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
                                     if imf.shape[0] != tfr+1:
                                         imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
                                     imfs_ch.append(imf)
@@ -237,10 +237,10 @@ class DREAMERDataset(Dataset):
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
                             imfs = []
-                            for i in range(stimulis_j.shape[0]):
+                            for i_emd in range(stimulis_j.shape[0]):
                                 imfs_ch = []
-                                for j in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i, j], max_imf=tfr)
+                                for j_emd in range(stimulis_j.shape[1]):
+                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
                                     if imf.shape[0] != tfr+1:
                                         imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
                                     imfs_ch.append(imf)
@@ -291,10 +291,10 @@ class DREAMERDataset(Dataset):
                             X.append(torch.tensor(cwt, dtype=torch.float32))
                         elif tfr is not None:
                             imfs = []
-                            for i in range(stimulis_j.shape[0]):
+                            for i_emd in range(stimulis_j.shape[0]):
                                 imfs_ch = []
-                                for j in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i, j], max_imf=tfr)
+                                for j_emd in range(stimulis_j.shape[1]):
+                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
                                     if imf.shape[0] != tfr+1:
                                         imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
                                     imfs_ch.append(imf)
