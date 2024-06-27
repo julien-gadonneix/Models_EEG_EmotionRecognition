@@ -20,12 +20,13 @@ MODEL_CHOICES = ["EEGNet", "CapsEEGNet", "TCNet"]
 def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1=None):
     model.train()
     avg_loss = 0
+    name = 'TCNet' if dev1 is not None else model.name
     for X_batch, Y_batch in train_loader:
-        if model.name not in ['CapsEEGNet', 'TCNet']:
+        if name not in ['CapsEEGNet', 'TCNet']:
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         else:
             X_batch = X_batch.to(device)
-            if model.name == 'TCNet' and dev1 is not None:
+            if name == 'TCNet' and dev1 is not None:
                 Y_batch = Y_batch.to(dev1)
             else:
                 Y_batch = Y_batch.to(device)
@@ -37,9 +38,12 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, Y_batch)
-        if model.name in ['CapsEEGNet', 'TCNet']:
-            loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
-        if model.name == 'MLFCapsNet':
+        if name in ['CapsEEGNet', 'TCNet']:
+            if dev1 is None:
+                loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
+            else:
+                loss += torch.norm(model.module.primaryCaps.caps.weight, p=2) + torch.norm(model.module.emotionCaps.W, p=2)
+        if name == 'MLFCapsNet':
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
         avg_loss += loss.item()
         scaler.scale(loss).backward()
@@ -53,13 +57,14 @@ def test_f(model, test_loader, loss_fn, device, is_ok, dev1=None):
     correct = 0
     total = 0
     avg_loss = 0
+    name = 'TCNet' if dev1 is not None else model.name
     with torch.no_grad():
         for X_batch, Y_batch in test_loader:
-            if model.name not in ['CapsEEGNet', 'TCNet']:
+            if name not in ['CapsEEGNet', 'TCNet']:
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
             else:
                 X_batch = X_batch.to(device)
-                if model.name == 'TCNet' and dev1 is not None:
+                if name == 'TCNet' and dev1 is not None:
                     Y_batch = Y_batch.to(dev1)
                 else:
                     Y_batch = Y_batch.to(device)
@@ -70,8 +75,13 @@ def test_f(model, test_loader, loss_fn, device, is_ok, dev1=None):
             else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, Y_batch)
-            if model.name in ['CapsEEGNet', 'TCNet']:
-                loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
+            if name in ['CapsEEGNet', 'TCNet']:
+                if dev1 is None:
+                    loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
+                else:
+                    loss += torch.norm(model.module.primaryCaps.caps.weight, p=2) + torch.norm(model.module.emotionCaps.W, p=2)
+            if name == 'MLFCapsNet':
+                loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
             avg_loss += loss.item()
             _, predicted = torch.max(y_pred.data, 1)
             total += Y_batch.size(0)
@@ -88,6 +98,7 @@ def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, m
     plt.xlabel("Predicted \n Classification accuracy: %.4f " % (acc))
     plt.tight_layout()
     plt.savefig(figs_path + 'confusion_matrix_subject_' + mode + '_classification_' + selected_emotion +'.png')
+    plt.close()
 
 
 def draw_loss(losses_train, losses_test, figs_path, selected_emotion, subject):
