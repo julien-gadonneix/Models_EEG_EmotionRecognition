@@ -15,6 +15,7 @@ from sklearn.metrics import confusion_matrix
 
 
 MODEL_CHOICES = ["EEGNet", "CapsEEGNet", "TCNet"]
+EMOTION_CHOICES = ["arousal", "valence", "dominance"]
 
 
 def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1=None):
