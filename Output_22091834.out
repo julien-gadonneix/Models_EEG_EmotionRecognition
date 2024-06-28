@@ -1,0 +1,7 @@
+Using device: cuda
+Building dataset.
+Dataset with subjects: [0] ...
+... and all sessions/videos mixed.
+Fold no.1:
+3339 train samples
+371 test samples
