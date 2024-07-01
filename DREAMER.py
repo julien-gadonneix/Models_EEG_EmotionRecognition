@@ -186,20 +186,20 @@ def hyperopt_DREAMER(args):
 
       ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
       tuner = tune.Tuner(
-      tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
-      run_config=train.RunConfig(
-            checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
-            verbose=0
-      ),
-      tune_config=tune.TuneConfig(
-            metric="mean_accuracy",
-            mode="max",
-            num_samples=num_s,
-            scheduler=ASHAScheduler(max_t=epochs, grace_period=100),
-            trial_name_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}",
-            trial_dirname_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}"
-      ),
-      param_space=search_space
+            tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
+            run_config=train.RunConfig(
+                  checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
+                  verbose=0
+            ),
+            tune_config=tune.TuneConfig(
+                  metric="mean_accuracy",
+                  mode="max",
+                  num_samples=num_s,
+                  scheduler=ASHAScheduler(max_t=epochs, grace_period=100),
+                  trial_name_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}",
+                  trial_dirname_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}"
+            ),
+            param_space=search_space
       )
       results = tuner.fit()
       print("Best config is:", results.get_best_result().config)
@@ -221,7 +221,7 @@ def hyperopt_DREAMER(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Fine-tunes BENDER models.")
+    parser = argparse.ArgumentParser(description="Optimize hyperparameters with the DREAMER dataset.")
     parser.add_argument('model', choices=MODEL_CHOICES)
     parser.add_argument('emotion', choices=EMOTION_CHOICES)
     args = parser.parse_args()

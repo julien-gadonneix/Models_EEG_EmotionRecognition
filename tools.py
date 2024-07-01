@@ -15,13 +15,16 @@ MODEL_CHOICES = ["EEGNet", "CapsEEGNet", "TCNet"]
 EMOTION_CHOICES = ["arousal", "valence", "dominance"]
 
 
-def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
+def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, ddp=False):
     model.train()
     avg_loss = 0
     for X_batch, Y_batch in train_loader:
         if model.name not in ['CapsEEGNet', 'TCNet']:
-            X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
-        else:
+            if not ddp:
+                X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
+            else:
+                X_batch = X_batch.to(memory_format=torch.channels_last)
+        elif not ddp:
             X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
         optimizer.zero_grad(set_to_none=True)
         if is_ok:
