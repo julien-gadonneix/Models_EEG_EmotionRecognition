@@ -327,10 +327,10 @@ class MLP(nn.Module):
         return self.ff(x)
     
 class SwinEncoder(nn.Module):
-    def __init__(self, emb_size, num_heads, dev, window_size=2):
+    def __init__(self, emb_size, num_heads, dev, window_size=2, shifted=True):
         super().__init__()
         self.WMSA = ShiftedWindowMSA(emb_size, num_heads, dev, window_size, shifted=False)
-        self.SWMSA = ShiftedWindowMSA(emb_size, num_heads, dev, window_size, shifted=True)
+        self.SWMSA = ShiftedWindowMSA(emb_size, num_heads, dev, window_size, shifted=shifted)
         self.ln = nn.LayerNorm(emb_size, device=dev)
         self.MLP = MLP(emb_size, dev)
         
@@ -368,7 +368,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TCNet(nn.Module):
-    def __init__(self, nb_classes, Chans, dev0=None, dev1=None):
+    def __init__(self, nb_classes, Chans, shifted, dev0=None, dev1=None):
         super(TCNet, self).__init__()
         """ PyTorch Implementation of TC-Net """
 
@@ -387,7 +387,7 @@ class TCNet(nn.Module):
             # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
             # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
             # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
-            self.stages.append(SwinEncoder(d, 1, dev0, window_size=2))
+            self.stages.append(SwinEncoder(d, 1, dev0, window_size=2, shifted=shifted))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=dev0))
                 d *= 2
