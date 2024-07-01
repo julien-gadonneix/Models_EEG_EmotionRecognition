@@ -9,7 +9,7 @@ import os
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed, EEGNet_WT, TCNet
+from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed, EEGNet_WT, TCNet, TCNet_EMD
 from preprocess.preprocess_DREAMER import DREAMERDataset
 from tools import train_f, test_f, xDawnRG, margin_loss
 
@@ -26,10 +26,11 @@ from ray.tune.schedulers import ASHAScheduler
 ###############################################################################
 
 selected_emotion = 'valence'
+selected_model = 'TCNet'
 print('Selected emotion:', selected_emotion)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-is_ok = device.type != 'mps'
+is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
 if device.type != "cuda":
       raise Exception("CUDA not available. Please select a GPU device.")
 else:
@@ -46,13 +47,13 @@ best_order = 3
 best_type = 'butter'
 best_start = 1
 best_sample = 128
-best_std = True
+best_std = False, # True
 subjects = [i for i in range(3)] # None
 
 epochs = 1000
 test_split = .25
 
-best_lr = 0.001
+best_lr = 0.000001
 best_batch_size = 128
 best_F1 = 64
 best_D = 8
@@ -63,7 +64,7 @@ best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
 best_innerChans = 18
-best_nb_freqs = {'freqs': np.arange(2, 50), 'output': 'power'}
+best_nb_freqs = 2 # {'freqs': np.arange(2, 50), 'output': 'power'}
 
 best_group_classes = True
 best_adapt_classWeights = False
@@ -105,7 +106,10 @@ search_space = {
     "nr": best_nr, #  tune.grid_search([.25, 1., None])
     "innerChans":  best_innerChans, # tune.grid_search([16, 18, 20]),
     "nb_freqs": best_nb_freqs, # tune.grid_search([0, 1, 2]),
-    "std": best_std # tune.grid_search([False, True]),
+    "std": best_std, # tune.grid_search([False, True]),
+    "shifted": tune.grid_search([True, False]),
+    "loss_fn": tune.grid_search([torch.nn.CrossEntropyLoss().to(device), margin_loss]),
+    "optim": tune.grid_search([torch.optim.Adam, torch.optim.AdamW])
 }
 
 def train_DREAMER(config):
@@ -148,7 +152,7 @@ def train_DREAMER(config):
       # model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=config["sample"], dropoutRate=config['dropout'], 
       #                        kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=config["norm_rate"], nr=config["nr"],
       #                        dropoutType='Dropout', nb_freqs=config["nb_freqs"]+1).to(device=device, memory_format=torch.channels_last)
-      model = TCNet(nb_classes=nb_classes, Chans=chans, shifted=config["shifted"]).to(device=device)
+      model = TCNet_EMD(nb_classes=nb_classes, Chans=chans, nb_freqs=config["nb_freqs"]+1, shifted=config["shifted"], kern_emd=config["kernLength"]).to(device=device)
 
       # loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
       loss_fn = config["loss_fn"]
@@ -163,8 +167,10 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, config["norm"])
-            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok, config["norm"])
+            train_loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
+            print(f"Epoch {epoch+1}/{epochs} - Train loss: {train_loss}")
+            acc, test_loss = test_f(model, test_loader, loss_fn, device, is_ok)
+            print(f"Epoch {epoch+1}/{epochs} - Test loss: {test_loss} - Test accuracy: {acc}")
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
@@ -182,7 +188,7 @@ tuner = tune.Tuner(
     tune.with_resources(train_DREAMER, resources=tune.PlacementGroupFactory([{"CPU": n_cpu/n_parallel, "GPU": n_gpu/n_parallel, f"accelerator_type:{accelerator}": n_gpu/n_parallel}])),
     run_config=train.RunConfig(
           checkpoint_config=train.CheckpointConfig(checkpoint_at_end=False, num_to_keep=4),
-          verbose=0
+          verbose=1
     ),
     tune_config=tune.TuneConfig(
           metric="mean_accuracy",

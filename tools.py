@@ -18,19 +18,14 @@ MODEL_CHOICES = ["EEGNet", "CapsEEGNet", "TCNet"]
 EMOTION_CHOICES = ["arousal", "valence", "dominance"]
 
 
-def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1=None):
+def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok):
     model.train()
     avg_loss = 0
-    name = 'TCNet' if dev1 is not None else model.name
     for X_batch, Y_batch in train_loader:
-        if name not in ['CapsEEGNet', 'TCNet']:
+        if model.name not in ['CapsEEGNet', 'TCNet']:
             X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
         else:
-            X_batch = X_batch.to(device)
-            if name == 'TCNet' and dev1 is not None:
-                Y_batch = Y_batch.to(dev1)
-            else:
-                Y_batch = Y_batch.to(device)
+            X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
         optimizer.zero_grad(set_to_none=True)
         if is_ok:
             with torch.autocast(device_type=device.type, dtype=torch.float16):
@@ -39,12 +34,9 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, Y_batch)
-        if name in ['CapsEEGNet', 'TCNet']:
-            if dev1 is None:
-                loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
-            else:
-                loss += torch.norm(model.module.primaryCaps.caps.weight, p=2) + torch.norm(model.module.emotionCaps.W, p=2)
-        if name == 'MLFCapsNet':
+        if model.name in ['CapsEEGNet', 'TCNet']:
+            loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
+        if model.name == 'MLFCapsNet':
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
         avg_loss += loss.item()
         scaler.scale(loss).backward()
@@ -53,22 +45,17 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1
     return avg_loss / len(train_loader)
 
 
-def test_f(model, test_loader, loss_fn, device, is_ok, dev1=None):
+def test_f(model, test_loader, loss_fn, device, is_ok):
     model.eval()
     correct = 0
     total = 0
     avg_loss = 0
-    name = 'TCNet' if dev1 is not None else model.name
     with torch.no_grad():
         for X_batch, Y_batch in test_loader:
-            if name not in ['CapsEEGNet', 'TCNet']:
+            if model.name not in ['CapsEEGNet', 'TCNet']:
                 X_batch, Y_batch = X_batch.to(device=device, memory_format=torch.channels_last), Y_batch.to(device)
             else:
-                X_batch = X_batch.to(device)
-                if name == 'TCNet' and dev1 is not None:
-                    Y_batch = Y_batch.to(dev1)
-                else:
-                    Y_batch = Y_batch.to(device)
+                X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
             if is_ok:
                 with torch.autocast(device_type=device.type, dtype=torch.float16):
                     y_pred = model(X_batch)
@@ -76,12 +63,9 @@ def test_f(model, test_loader, loss_fn, device, is_ok, dev1=None):
             else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, Y_batch)
-            if name in ['CapsEEGNet', 'TCNet']:
-                if dev1 is None:
-                    loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
-                else:
-                    loss += torch.norm(model.module.primaryCaps.caps.weight, p=2) + torch.norm(model.module.emotionCaps.W, p=2)
-            if name == 'MLFCapsNet':
+            if model.name in ['CapsEEGNet', 'TCNet']:
+                loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
+            if model.name == 'MLFCapsNet':
                 loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
             avg_loss += loss.item()
             _, predicted = torch.max(y_pred.data, 1)
@@ -144,23 +128,3 @@ def margin_loss(y_pred, y_true):
     L = y_true * torch.square(torch.maximum(torch.zeros_like(y_pred, device=y_pred.device), 0.9 - y_pred)) + \
         0.5 * (1 - y_true) * torch.square(torch.maximum(torch.zeros_like(y_pred, device=y_pred.device), y_pred - 0.1))
     return torch.mean(torch.sum(L, 1))
-
-
-def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'  # Adjust based on available GPUs
-    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-
-
-def cleanup():
-    dist.destroy_process_group()
-
-
-def run_fn(demo_fn, world_size, args):
-    mp.spawn(demo_fn,
-             args=(world_size, args),
-             nprocs=world_size,
-             join=True)

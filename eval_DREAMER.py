@@ -9,7 +9,7 @@ import argparse
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP, CapsEEGNet, TCNet, EEGNet_ChanRed, EEGNet_WT, TCNet_EMD
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, margin_loss, cleanup, setup, run_fn, MODEL_CHOICES, EMOTION_CHOICES
+from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, margin_loss, MODEL_CHOICES, EMOTION_CHOICES
 from sklearn.model_selection import KFold
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -18,19 +18,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 
-def eval_DREAMER(rank, world_size, args, mp=True):
-
-    if mp:
-        assert args.model == 'TCNet', "Not yet implemented for other model than TCNet"
-
-        print(f"Running DDP with model parallel on rank {rank}.")
-        setup(rank, world_size)
-        dev0 = rank * 2
-        dev1 = rank * 2 + 1
-        device = dev0
-    else:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-        dev1 = None
+def eval_DREAMER(args):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
 
     ###############################################################################
@@ -80,10 +69,10 @@ def eval_DREAMER(rank, world_size, args, mp=True):
     best_group_classes = best_groups_classes[selected_model]
     best_adapt_classWeights = False
     if best_group_classes:
-        class_weights = torch.tensor([1., 1.], device=device) if not mp else torch.tensor([1., 1.], device=dev1)
+        class_weights = torch.tensor([1., 1.], device=device)
         names = ['Low', 'High']
     else:
-        class_weights = torch.tensor([1., 1., 1., 1., 1.], device=device) if not mp else torch.tensor([1., 1., 1., 1., 1.], device=dev1)
+        class_weights = torch.tensor([1., 1., 1., 1., 1.], device=device)
         names = ['1', '2', '3', '4', '5']
 
     n_components = 2  # pick some components for xDawnRG
@@ -148,21 +137,14 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                                         kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
                                         norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(device=device, memory_format=torch.channels_last)
                 elif selected_model == 'TCNet':
-                    if mp:
-                        model = TCNet(nb_classes, chans, dev0, dev1)
-                        model = DDP(model)
-                    else:
-                        model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr, kern_emd=best_kernLength).to(device=device)
+                    model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr+1, kern_emd=best_kernLength).to(device=device)
                 else:
                     raise ValueError('Invalid model selected')
 
                 if selected_model in ['CapsEEGNet', 'TCNet']:
                     loss_fn = margin_loss
                 else:
-                    if mp:
-                        loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(dev1) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(dev1)
-                    else:
-                        loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
+                    loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).to(device) if best_adapt_classWeights else torch.nn.CrossEntropyLoss(weight=class_weights).to(device)
                 optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
                 scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
@@ -176,9 +158,9 @@ def eval_DREAMER(rank, world_size, args, mp=True):
                 losses_train = []
                 losses_test = []
                 for epoch in range(epochs_dep_mix):
-                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, dev1=dev1)
+                    loss = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
                     losses_train.append(loss)
-                    acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok, dev1=dev1)
+                    acc, loss_test = test_f(model, valid_loader, loss_fn, device, is_ok)
                     losses_test.append(loss_test)
                     if epoch % 50 == 0:
                         print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
@@ -407,10 +389,6 @@ def eval_DREAMER(rank, world_size, args, mp=True):
 
     # xDawnRG(dataset, n_components, train_indices, test_indices, chans, samples, names, figs_path, info_str)
 
-    if mp:
-        cleanup()
-
-
 
 
 if __name__ == '__main__':
@@ -421,8 +399,7 @@ if __name__ == '__main__':
     n_gpus = torch.cuda.device_count()
 
     if n_gpus >= 2:
-        world_size = n_gpus//2
-        run_fn(eval_DREAMER, world_size, args)
+        print('Coming soon...')
 
     else:
-        eval_DREAMER(None, None, args, mp=False)
+        eval_DREAMER(args)
