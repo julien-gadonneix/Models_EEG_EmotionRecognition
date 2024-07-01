@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 
 def eval_DREAMER(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+    print('Using device:', device)
 
 
     ###############################################################################
@@ -25,10 +26,8 @@ def eval_DREAMER(args):
     ###############################################################################
 
     selected_model = args.model
-    selected_emotion = args.emotion
-
-    print('Using device:', device)
     is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
+    selected_emotion = args.emotion
 
     best_use_ecg = False
     best_highcut = None
