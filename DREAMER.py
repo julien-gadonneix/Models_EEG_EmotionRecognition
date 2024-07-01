@@ -9,9 +9,9 @@ import os
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed, EEGNet_WT
+from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed, EEGNet_WT, TCNet
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train_f, test_f, xDawnRG
+from tools import train_f, test_f, xDawnRG, margin_loss
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -47,9 +47,9 @@ best_type = 'butter'
 best_start = 1
 best_sample = 128
 best_std = True
-subjects = None
+subjects = [i for i in range(3)] # None
 
-epochs = 500
+epochs = 1000
 test_split = .25
 
 best_lr = 0.001
@@ -63,9 +63,9 @@ best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
 best_innerChans = 18
-best_nb_freqs = 2
+best_nb_freqs = {'freqs': np.arange(2, 50), 'output': 'power'}
 
-best_group_classes = False
+best_group_classes = True
 best_adapt_classWeights = False
 
 chans = 14
@@ -86,7 +86,7 @@ num_s = 1
 ###############################################################################
 
 search_space = {
-    "lr": best_lr, # tune.grid_search([.0005+.0001*i for i in range(11)]),
+    "lr": tune.grid_search([.001, .0001, .00001, .000001, .0000001]),
     "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
     "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
     "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
@@ -122,10 +122,9 @@ def train_DREAMER(config):
       # Data loading
       ###############################################################################
 
-      tfr = config["nb_freqs"] if config["nb_freqs"]!=0 else None
       dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, sessions=None, samples=config["sample"], start=config["start"],
                                lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save,
-                               group_classes=config["group_classes"], tfr=tfr, use_ecg=False, std=config["std"])
+                               group_classes=config["group_classes"], tfr=config["nb_freqs"], use_ecg=False, std=config["std"])
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
@@ -146,15 +145,14 @@ def train_DREAMER(config):
       # Model configurations
       ###############################################################################
 
-      # model = EEGNet(nb_classes=nb_classes, Chans=chans, Samples=config["sample"], dropoutRate=config['dropout'], 
-      #                kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'],
-      #                norm_rate=config["norm_rate"], nr=config["nr"], dropoutType='Dropout').to(device=device, memory_format=torch.channels_last)
-      model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=config["sample"], dropoutRate=config['dropout'], 
-                             kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=config["norm_rate"], nr=config["nr"],
-                             dropoutType='Dropout', nb_freqs=config["nb_freqs"]+1).to(device=device, memory_format=torch.channels_last)
+      # model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=config["sample"], dropoutRate=config['dropout'], 
+      #                        kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=config["norm_rate"], nr=config["nr"],
+      #                        dropoutType='Dropout', nb_freqs=config["nb_freqs"]+1).to(device=device, memory_format=torch.channels_last)
+      model = TCNet(nb_classes=nb_classes, Chans=chans, shifted=config["shifted"]).to(device=device)
 
-      loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
-      optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
+      # loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
+      loss_fn = config["loss_fn"]
+      optimizer = config["optim"](model.parameters(), lr=config['lr'])
       scaler = torch.cuda.amp.GradScaler()
 
       # torch.backends.cudnn.benchmark = True
@@ -165,8 +163,8 @@ def train_DREAMER(config):
       ###############################################################################
 
       for epoch in range(epochs):
-            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok)
-            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok)
+            _ = train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, config["norm"])
+            acc, _ = test_f(model, test_loader, loss_fn, device, is_ok, config["norm"])
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                   checkpoint = None
@@ -190,7 +188,7 @@ tuner = tune.Tuner(
           metric="mean_accuracy",
           mode="max",
           num_samples=num_s,
-          scheduler=ASHAScheduler(max_t=epochs, grace_period=10),
+          scheduler=ASHAScheduler(max_t=epochs, grace_period=100),
           trial_name_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}",
           trial_dirname_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}"
     ),
