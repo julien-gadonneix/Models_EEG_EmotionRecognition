@@ -451,7 +451,6 @@ class TCNet_EMD(nn.Module):
                 d *= 2
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
-        self.dropout = nn.Dropout(0.1)
         self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2', dev1)
         self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8, dev1)
     
@@ -483,7 +482,6 @@ class TCNet_EMD(nn.Module):
                 x = self.PatchMerging[i](x)
         if self.dev1 is not None:
             x = x.to(self.dev1)
-        x = self.dropout(x)
         x = self.primaryCaps(x)
         x = self.emotionCaps(x)
         return torch.norm(x, dim=2).squeeze()
