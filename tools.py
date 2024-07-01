@@ -2,9 +2,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
-import os
-import torch.distributed as dist
-import torch.multiprocessing as mp
 
 from pyriemann.estimation import XdawnCovariances
 from pyriemann.tangentspace import TangentSpace

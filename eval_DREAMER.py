@@ -14,8 +14,6 @@ from sklearn.model_selection import KFold
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
-from torch.nn.parallel import DistributedDataParallel as DDP
-
 
 
 def eval_DREAMER(args):
