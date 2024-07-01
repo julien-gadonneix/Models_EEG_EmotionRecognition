@@ -491,7 +491,7 @@ class TCNet_EMD(nn.Module):
 
 
 class MLFCapsNet(nn.Module):
-    def __init__(self, nb_classes, Chans):
+    def __init__(self, nb_classes, device):
         super(MLFCapsNet, self).__init__()
         """ PyTorch Implementation of MLF-CapsNet """
 
@@ -499,8 +499,8 @@ class MLFCapsNet(nn.Module):
         
         self.conv = nn.Conv2d(1, 256, 6, 2, padding='valid') #TODO: test it
         self.relu = nn.ReLU()
-        self.primaryCaps = PrimaryCap(256, 8, 32, 6, 1, 'same', 'v2')
-        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8)
+        self.primaryCaps = PrimaryCap(256, 8, 32, 6, 1, 'same', 'v2', device)
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 32*1*128, 8, device)
     
 
     def forward(self, x):
