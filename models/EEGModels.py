@@ -442,12 +442,16 @@ class TCNet_EMD(nn.Module):
             # encoder_layer = nn.TransformerEncoderLayer(d_model=d*4, nhead=1, batch_first=True, norm_first=True, device=device)
             # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
             # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
-            self.stages.append(SwinEncoder(d, 1, dev0, window_size=2))
+            if i == 2:
+                self.stages.append(nn.ModuleList([SwinEncoder(d, 1, dev0, window_size=2), SwinEncoder(d, 1, dev0, window_size=2), SwinEncoder(d, 1, dev0, window_size=2)]))
+            else:
+                self.stages.append(SwinEncoder(d, 1, dev0, window_size=2))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1), device=dev0))
                 d *= 2
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
+        self.dropout = nn.Dropout(0.1)
         self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2', dev1)
         self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8, dev1)
     
@@ -464,7 +468,14 @@ class TCNet_EMD(nn.Module):
             # x = x.permute(0, 2, 1)
             # x = self.PositionalEncoding[i](x) * math.sqrt(fs*(2**i)*4)
             # x = self.EEG_Transformer[i](x)
-            x = self.stages[i](x)
+            if i == 2:
+                for j in range(3):
+                    _, _, height, width = x.shape
+                    x = self.stages[i][j](x)
+                    if j < 2:
+                        x = rearrange(x, 'b (h w) c -> b c h w', h=height, w=width)
+            else:
+                x = self.stages[i](x)
             x = rearrange(x, 'b (h w) c -> b c h w', h=height, w=width)
             # x = x.permute(0, 2, 1)
             # x = x.reshape(bs, fs*(2**i), hs//(2**i), ws//(2**i))
@@ -472,6 +483,7 @@ class TCNet_EMD(nn.Module):
                 x = self.PatchMerging[i](x)
         if self.dev1 is not None:
             x = x.to(self.dev1)
+        x = self.dropout(x)
         x = self.primaryCaps(x)
         x = self.emotionCaps(x)
         return torch.norm(x, dim=2).squeeze()
