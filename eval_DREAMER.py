@@ -19,6 +19,7 @@ import ray.train.torch
 from ray.train.torch import TorchTrainer
 from ray.train import ScalingConfig
 from ray.train import RunConfig
+import ray
 
 
 
@@ -32,7 +33,6 @@ def eval_DREAMER(args):
     n_cpu = os.cpu_count()
     n_gpu = torch.cuda.device_count()
     accelerator = properties.name.split()[1]
-    n_parallel = 2
 
     selected_model = args.model
     is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
@@ -66,7 +66,7 @@ def eval_DREAMER(args):
 
         best_lrs = {'EEGNet': 0.001, 'CapsEEGNet': 0.01, 'TCNet': 0.000001}  # TCNet should be 0.000001
         best_lr = best_lrs[selected_model]
-        best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 128}
+        best_batch_sizes = {'EEGNet': 128, 'CapsEEGNet': 16, 'TCNet': 64}
         best_batch_size = best_batch_sizes[selected_model]
         worker_batch_size = best_batch_size // ray.train.get_context().get_world_size()
         best_F1 = 64
@@ -152,7 +152,7 @@ def eval_DREAMER(args):
                                             kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
                                             norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(memory_format=torch.channels_last)
                     elif selected_model == 'TCNet':
-                        model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr+1, kern_emd=best_kernLength)
+                        model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr+1, shifted=True, kern_emd=best_kernLength)
                     else:
                         raise ValueError('Invalid model selected')
                     model = ray.train.torch.prepare_model(model)
@@ -164,7 +164,7 @@ def eval_DREAMER(args):
                     optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
                     scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
-                    torch.backends.cudnn.benchmark = True
+                    # torch.backends.cudnn.benchmark = True
 
 
                     ###############################################################################
@@ -277,7 +277,7 @@ def eval_DREAMER(args):
                     optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
                     scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
-                    torch.backends.cudnn.benchmark = True
+                    # torch.backends.cudnn.benchmark = True
 
 
                     ###############################################################################
@@ -378,7 +378,7 @@ def eval_DREAMER(args):
                 optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
                 scaler = torch.cuda.amp.GradScaler(enabled=is_ok)
 
-                torch.backends.cudnn.benchmark = True
+                # torch.backends.cudnn.benchmark = True
 
 
                 ###############################################################################
@@ -412,9 +412,14 @@ def eval_DREAMER(args):
 
             classification_accuracy(np.concatenate(preds), np.concatenate(Y_test), names, figs_path, selected_emotion, 'independent')
 
+    ray.init(num_cpus=n_cpu, num_gpus=n_gpu)
     trainer = TorchTrainer(
         train_eval_DREAMER,
-        scaling_config=ScalingConfig(num_workers=n_gpu*n_parallel, use_gpu=True)
+        scaling_config=ScalingConfig(num_workers=n_gpu,
+                                     use_gpu=True,
+                                     resources_per_worker={"CPU": (n_cpu-1)/n_gpu, "GPU": 1.0},
+                                     accelerator_type=accelerator),
+        run_config=RunConfig(verbose=1)
     )
 
     results = trainer.fit()

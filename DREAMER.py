@@ -12,7 +12,7 @@ import argparse
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed, EEGNet_WT, TCNet, TCNet_EMD
 from preprocess.preprocess_DREAMER import DREAMERDataset
-from tools import train_f, test_f, xDawnRG, margin_loss, MODEL_CHOICES, EMOTION_CHOICES
+from tools import train_f, test_f, xDawnRG, margin_loss, MODEL_HYPEROPT_CHOICES, EMOTION_CHOICES
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
@@ -57,6 +57,8 @@ def hyperopt_DREAMER(args):
       test_split = .25
 
       best_lr = 0.000001
+      best_batch_sizes = {'EEGNet': 128, 'TCNet': 64}
+      best_batch_size = best_batch_sizes[selected_model]
       best_batch_size = 128
       best_F1 = 64
       best_D = 8
@@ -222,7 +224,7 @@ def hyperopt_DREAMER(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Optimize hyperparameters with the DREAMER dataset.")
-    parser.add_argument('model', choices=MODEL_CHOICES)
+    parser.add_argument('model', choices=MODEL_HYPEROPT_CHOICES)
     parser.add_argument('emotion', choices=EMOTION_CHOICES)
     args = parser.parse_args()
     

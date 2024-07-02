@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix
 
 
 MODEL_CHOICES = ["EEGNet", "CapsEEGNet", "TCNet"]
+MODEL_HYPEROPT_CHOICES = ["EEGNet", "TCNet"]
 EMOTION_CHOICES = ["arousal", "valence", "dominance"]
 
 
@@ -34,7 +35,7 @@ def train_f(model, train_loader, optimizer, loss_fn, scaler, device, is_ok, ddp=
         else:
             y_pred = model(X_batch)
             loss = loss_fn(y_pred, Y_batch)
-        if model.name in ['CapsEEGNet', 'TCNet']:
+        if model.name == 'CapsEEGNet':
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
         if model.name == 'MLFCapsNet':
             loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
@@ -63,7 +64,7 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
             else:
                 y_pred = model(X_batch)
                 loss = loss_fn(y_pred, Y_batch)
-            if model.name in ['CapsEEGNet', 'TCNet']:
+            if model.name == 'CapsEEGNet':
                 loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2)
             if model.name == 'MLFCapsNet':
                 loss += torch.norm(model.primaryCaps.caps.weight, p=2) + torch.norm(model.emotionCaps.W, p=2) + torch.norm(model.conv.weight, p=2)
