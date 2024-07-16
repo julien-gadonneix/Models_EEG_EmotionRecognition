@@ -76,12 +76,13 @@ def test_f(model, test_loader, loss_fn, device, is_ok):
     return correct / total, avg_loss / len(test_loader)
 
 
-def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, mode):
+def classification_accuracy(preds, Y_test, names, figs_path, selected_emotion, mode, accs):
     acc = np.mean(preds == Y_test)
-    print("Subject-" + mode + " classification accuracy on " + selected_emotion + ": %f " % (acc))
+    std = np.std(accs)
+    print("Subject-" + mode + " classification accuracy on " + selected_emotion + ": %f \u00B1 %f" % (acc, std))
     ConfusionMatrixDisplay(confusion_matrix(preds, Y_test, labels=np.arange(len(names))), display_labels=names).plot()
     plt.title("Subject-" + mode + " classification accuracy on " + selected_emotion, fontsize=10)
-    plt.xlabel("Predicted \n Classification accuracy: %.4f " % (acc))
+    plt.xlabel("Predicted \n Classification accuracy: %.4f \u00B1 %f" % (acc, std))
     plt.tight_layout()
     plt.savefig(figs_path + 'confusion_matrix_subject_' + mode + '_classification_' + selected_emotion +'.png')
     plt.close()

@@ -50,29 +50,34 @@ def hyperopt_DREAMER(args):
       best_type = 'butter'
       best_start = 1
       best_sample = 128
-      best_std = False, # True
-      subjects = [i for i in range(3)] # None
+      best_stds = {'EEGNet': True, 'TCNet': False}
+      best_std = best_stds[selected_model]
+      subjects = [i for i in range(2)] # None
 
       epochs = 1000
-      test_split = .25
+      test_split = .2
 
-      best_lr = 0.000001
+      best_lrs = {'EEGNet': 0.001, 'TCNet': 0.0001}
+      best_lr = best_lrs[selected_model]
       best_batch_sizes = {'EEGNet': 128, 'TCNet': 64}
       best_batch_size = best_batch_sizes[selected_model]
       best_batch_size = 128
       best_F1 = 64
       best_D = 8
       best_F2 = 64
-      best_kernLengths = {'arousal': 20, 'dominance': 12, 'valence': 12} # perhaps go back to 64 for f_min = 2Hz
-      best_kernLength = best_kernLengths[selected_emotion]
+      best_kernLengths = {'EEGNet': {'arousal': 20, 'dominance': 12, 'valence': 12}, 'TCNet': {'arousal': 1, 'dominance': 12, 'valence': 8}} # perhaps go back to 64 for f_min = 2Hz
+      best_kernLength = best_kernLengths[selected_model][selected_emotion]
       best_dropout = .1
       best_norm_rate = .25
       best_nr = 1.
-      best_innerChans = 18
-      best_nb_freqs = 2 # {'freqs': np.arange(2, 50), 'output': 'power'}
+      best_innerChanss = {'EEGNet': 18, 'TCNet': 192}
+      best_innerChans = best_innerChanss[selected_model]
+      best_tfr = {'emd':2}, # {'freqs': np.arange(2, 50), 'output': 'power'}
+      best_num_heads = 4
 
       best_group_classes = True
       best_adapt_classWeights = False
+      best_shifted = True
 
       chans = 14
 
@@ -92,7 +97,7 @@ def hyperopt_DREAMER(args):
       ###############################################################################
 
       search_space = {
-      "lr": tune.grid_search([.0001, .00001, .000001, .0000001]),
+      "lr": best_lr, # tune.grid_search([.0001, .00001, .000001, .0000001]),
       "batch_size": best_batch_size, # tune.choice([32, 64, 128, 256, 512]),
       "sample": best_sample, # tune.grid_search([128, 256, 512, 1024, 2048]),
       "start": best_start, # tune.grid_search([0, 1, 2, 3, 4]),
@@ -110,11 +115,10 @@ def hyperopt_DREAMER(args):
       "norm_rate": best_norm_rate, # tune.grid_search([.25, 1., None]),
       "nr": best_nr, #  tune.grid_search([.25, 1., None])
       "innerChans":  best_innerChans, # tune.grid_search([16, 18, 20]),
-      "nb_freqs": best_nb_freqs, # tune.grid_search([0, 1, 2]),
+      "tfr": best_tfr, # tune.grid_search([{'emd':2}, {'eemd':2, 'sep_trends':True}, {'eemd':2, 'sep_trends':False}, {'ceemdan':2, 'beta_prog':True}, {'ceemdan':2, 'beta_prog':False}]),
       "std": best_std, # tune.grid_search([False, True]),
-      "shifted": tune.grid_search([True, False]),
-      "loss_fn": tune.grid_search([torch.nn.CrossEntropyLoss().to(device), margin_loss]),
-      "optim": tune.grid_search([torch.optim.Adam, torch.optim.AdamW])
+      "shifted": best_shifted, # tune.grid_search([True, False])
+      "num_heads": best_num_heads # tune.grid_search([1, 2, 4, 8])
       }
 
       def train_DREAMER(config):
@@ -133,7 +137,7 @@ def hyperopt_DREAMER(args):
 
             dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subjects, sessions=None, samples=config["sample"], start=config["start"],
                                     lowcut=config["lowcut"], highcut=config["highcut"], order=config["order"], type=config["type"], save=save,
-                                    group_classes=config["group_classes"], tfr=config["nb_freqs"], use_ecg=False, std=config["std"])
+                                    group_classes=config["group_classes"], tfr=config["tfr"], use_ecg=False, std=config["std"], n_jobs=n_cpu)
             dataset_size = len(dataset)
 
             indices = list(range(dataset_size))
@@ -154,14 +158,16 @@ def hyperopt_DREAMER(args):
             # Model configurations
             ###############################################################################
 
-            # model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=config["sample"], dropoutRate=config['dropout'], 
-            #                        kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=config["norm_rate"], nr=config["nr"],
-            #                        dropoutType='Dropout', nb_freqs=config["nb_freqs"]+1).to(device=device, memory_format=torch.channels_last)
-            model = TCNet_EMD(nb_classes=nb_classes, Chans=chans, nb_freqs=config["nb_freqs"]+1, shifted=config["shifted"], kern_emd=config["kernLength"]).to(device=device)
+            if selected_model == 'EEGNet':
+                  model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=config["innerChans"], Samples=config["sample"], dropoutRate=config['dropout'], 
+                                    kernLength=config['kernLength'], F1=config['F1'], D=config['D'], F2=config['F2'], norm_rate=config["norm_rate"], nr=config["nr"],
+                                    dropoutType='Dropout', nb_freqs=list(config["tfr"].values())[0]+1).to(device=device, memory_format=torch.channels_last)
+            elif selected_model == 'TCNet':
+                  model = TCNet_EMD(nb_classes=nb_classes, Chans=chans, nb_freqs=list(config["tfr"].values())[0]+1, shifted=config["shifted"],
+                                    kern_emd=config["kernLength"], innerChans=config["innerChans"], num_heads=config["num_heads"]).to(device=device)
 
-            # loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
-            loss_fn = config["loss_fn"]
-            optimizer = config["optim"](model.parameters(), lr=config['lr'])
+            loss_fn = torch.nn.CrossEntropyLoss(weight=dataset.class_weights).cuda() if config["adapt_classWeights"] else torch.nn.CrossEntropyLoss(weight=class_weights).cuda()
+            optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
             scaler = torch.cuda.amp.GradScaler()
 
             # torch.backends.cudnn.benchmark = True

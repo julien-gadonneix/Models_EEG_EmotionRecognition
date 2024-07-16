@@ -431,13 +431,13 @@ class TCNet(nn.Module):
 
 
 class TCNet_EMD(nn.Module):
-    def __init__(self, nb_classes, Chans, nb_freqs, shifted, kern_emd):
+    def __init__(self, nb_classes, Chans, nb_freqs, shifted, kern_emd, innerChans, num_heads):
         super(TCNet_EMD, self).__init__()
         """ PyTorch Implementation of TC-Net """
 
         self.name = 'TCNet'
 
-        self.emd_expansion = nn.Conv2d(nb_freqs, 48, (1, kern_emd), padding='same')
+        self.emd_expansion = nn.Conv2d(nb_freqs, innerChans, (1, kern_emd), padding='same')
         
         d = 32
         self.PatchPartition = nn.Conv2d(Chans, d, (3, 4), stride=(3, 4))
@@ -451,18 +451,18 @@ class TCNet_EMD(nn.Module):
             # self.EEG_Transformer.append(nn.TransformerEncoder(encoder_layer, num_layers=1, enable_nested_tensor=False))
             # # self.EEG_Transformer.append(nn.Transformer(d_model=d*4, batch_first=True, norm_first=True))
             if i == 2:
-                self.stages.append(nn.ModuleList([SwinEncoder(d, 1, window_size=2, shifted=shifted),
-                                                  SwinEncoder(d, 1, window_size=2, shifted=shifted),
-                                                  SwinEncoder(d, 1, window_size=2, shifted=shifted)]))
+                self.stages.append(nn.ModuleList([SwinEncoder(d, num_heads, window_size=2, shifted=shifted),
+                                                  SwinEncoder(d, num_heads, window_size=2, shifted=shifted),
+                                                  SwinEncoder(d, num_heads, window_size=2, shifted=shifted)]))
             else:
-                self.stages.append(SwinEncoder(d, 1, window_size=2))
+                self.stages.append(SwinEncoder(d, num_heads, window_size=2))
             if i < 3:
                 self.PatchMerging.append(nn.Conv2d(d, d*2, (4, 4), stride=(2, 2), padding=(1, 1)))
                 d *= 2
         # self.primaryCaps = PrimaryCaps(num_capsules=d, in_channels=8, out_channels=8, kernel_size=6, num_routes=8*1*124)
         # self.emotionCaps = EmotionCaps(num_capsules=nb_classes, num_routes=8*1*124, in_channels=d, out_channels=16)
         self.primaryCaps = PrimaryCap(d, 8, 48, 6, 1, 'same', 'v2')
-        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*48, 8)
+        self.emotionCaps = EmotionCap(nb_classes, 16, 3, 8*innerChans, 8)
     
 
     def forward(self, x):

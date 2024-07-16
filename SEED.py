@@ -39,6 +39,7 @@ n_parallel = 2
 
 best_start = 1
 best_sample = 200
+best_std = True
 subjects = None
 sessions = None
 
@@ -55,6 +56,7 @@ best_kernLength = 15 # perhaps go back to 100 for f_min = 2Hz
 best_dropout = .1
 best_norm_rate = .25
 best_nr = 1.
+best_tfr = None
 
 names = ['Negative', 'Neutral', 'Positive']
 
@@ -96,7 +98,8 @@ def train_SEED(config):
       # Data loading
       ###############################################################################
 
-      dataset = SEEDDataset(sets_path+info_str, subjects=subjects, sessions=sessions, samples=best_sample, start=best_start, save=False)
+      dataset = SEEDDataset(sets_path+info_str, subjects=subjects, sessions=sessions, samples=best_sample, start=best_start, save=False,
+                            tfr=best_tfr, std=best_std, n_jobs=n_cpu)
       dataset_size = len(dataset)
 
       indices = list(range(dataset_size))
