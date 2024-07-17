@@ -10,7 +10,7 @@ import os
 
 from models.EEGModels import EEGNet, EEGNet_SSVEP, EEGNet_ChanRed, EEGNet_WT, TCNet, TCNet_EMD
 from preprocess.preprocess_SEED import SEEDDataset
-from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, MODEL_CHOICES, EMOTION_CHOICES
+from tools import train_f, test_f, xDawnRG, classification_accuracy, draw_loss, MODEL_CHOICES
 from sklearn.model_selection import KFold
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -53,7 +53,6 @@ def eval_SEED(args):
         epochs_dep = 200
         epochs_ind = 20
         random_seed= 42
-        test_split = .33
 
         best_lr = 0.001
         best_batch_size = 128
@@ -79,7 +78,6 @@ def eval_SEED(args):
         cur_dir = Path(__file__).resolve().parent
         figs_path = str(cur_dir) + '/figs/'
         sets_path = str(cur_dir) + '/sets/'
-        models_path = str(cur_dir) + '/tmp/'
         save = False
 
         np.random.seed(random_seed)
@@ -299,7 +297,6 @@ def eval_SEED(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Evaluates the performance on the SEED dataset.")
     parser.add_argument('model', choices=MODEL_CHOICES)
-    parser.add_argument('emotion', choices=EMOTION_CHOICES)
     args = parser.parse_args()
     n_gpus = torch.cuda.device_count()
 
