@@ -3,9 +3,9 @@
 ### -- specify queue -- 
 #BSUB -q gpua100
 ### -- set the job Name -- 
-#BSUB -J DREAMER_dom
+#BSUB -J DREAMER_aro
 ### -- ask for number of cores (default: 1) -- 
-#BSUB -n 4
+#BSUB -n 6
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- specify that the cores must be on the same host -- 
@@ -33,4 +33,4 @@
 source /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/myenv/bin/activate
 
 
-python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py TCNet dominance
+python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py EEGNet arousal

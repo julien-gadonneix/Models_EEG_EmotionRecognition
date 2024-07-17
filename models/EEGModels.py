@@ -98,7 +98,7 @@ class EEGNet_WT(nn.Module):
     def __init__(self, nb_classes, Chans=64, InnerChans=14, Samples=128, dropoutRate=0.5, kernLength=64, F1=8, 
                  D=2, F2=16, norm_rate=0.25, nr=1., dropoutType='Dropout', nb_freqs=48):
         super(EEGNet_WT, self).__init__()
-        """ PyTorch Implementation of EEGNet zith wavelt transform as input """
+        """ PyTorch Implementation of EEGNet with wavelt transform as input """
 
         self.name = 'EEGNet'
         self.nb_freqs = nb_freqs

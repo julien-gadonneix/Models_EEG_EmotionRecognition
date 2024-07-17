@@ -33,6 +33,7 @@ def eval_DREAMER(args):
     n_cpu = os.cpu_count()
     n_gpu = torch.cuda.device_count()
     accelerator = properties.name.split()[1]
+    accelerator = accelerator.split("-")[0]
 
     selected_model = args.model
     is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
@@ -56,7 +57,7 @@ def eval_DREAMER(args):
         best_std = best_stds[selected_model]
         subjects = [[i] for i in range(23)]
         sessions = [[i] for i in range(18)]
-        best_tfrs = {'EEGNet': 2, 'CapsEEGNet': None, 'TCNet': 2} # {'freqs': np.arange(2, 50), 'output': 'power'}
+        best_tfrs = {'EEGNet': {'freqs': np.arange(2, 50), 'output': 'power'}, 'CapsEEGNet': None, 'TCNet': 2} # {'freqs': np.arange(2, 50), 'output': 'power'}
         best_tfr = best_tfrs[selected_model]
 
         epochs_dep_mixs = {'EEGNet': 500, 'CapsEEGNet': 300, 'TCNet': 3000} # TCNet should be 30
@@ -79,7 +80,7 @@ def eval_DREAMER(args):
         best_nr = 1.
         best_innerChans = 18
 
-        best_groups_classes = {'EEGNet': False, 'CapsEEGNet': True, 'TCNet': True}
+        best_groups_classes = {'EEGNet': True, 'CapsEEGNet': True, 'TCNet': True}
         best_group_classes = best_groups_classes[selected_model]
         best_adapt_classWeights = False
         if best_group_classes:
@@ -150,7 +151,7 @@ def eval_DREAMER(args):
                     elif selected_model == 'EEGNet':
                         model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
                                             kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(memory_format=torch.channels_last)
+                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=len(best_tfr['freqs'])).to(memory_format=torch.channels_last)
                     elif selected_model == 'TCNet':
                         model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr+1, shifted=True, kern_emd=best_kernLength)
                     else:
