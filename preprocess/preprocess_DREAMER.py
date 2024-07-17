@@ -5,12 +5,12 @@ import numpy as np
 import mne
 import os
 from pathlib import Path
-from PyEMD import EMD
+from PyEMD import EMD, EEMD, CEEMDAN
 
 
 class DREAMERDataset(Dataset):
     def __init__(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=.5, highcut=None, order=3, type="butter",
-                 save=False, group_classes=True, tfr=None, use_ecg=False, std=True):
+                 save=False, group_classes=True, tfr=None, use_ecg=False, std=True, n_jobs=1):
         data_path = path + 'data.pt'
         if os.path.exists(data_path):
             print("Loading dataset from file.")
@@ -19,11 +19,11 @@ class DREAMERDataset(Dataset):
             self.class_weights = torch.load(path + 'class_weights.pt')
         else:
             print("Building dataset.")
-            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, type, save, group_classes, tfr, use_ecg, std)
+            self._build(path, emotion, subjects, sessions, samples, start, lowcut, highcut, order, type, save, group_classes, tfr, use_ecg, std, n_jobs)
 
 
     def _build(self, path, emotion, subjects=None, sessions=None, samples=128, start=1, lowcut=.5, highcut=None, order=3, type="butter",
-               save=False, group_classes=True, tfr=None, use_ecg=False, std=True):
+               save=False, group_classes=True, tfr=None, use_ecg=False, std=True, n_jobs=1):
         wdir = Path(__file__).resolve().parent.parent.parent
         data_path = str(wdir) + '/data/DREAMER/'
         mat = scipy.io.loadmat(data_path + 'DREAMER.mat')
@@ -34,8 +34,12 @@ class DREAMERDataset(Dataset):
         n_subjects = int(n_subjects[0, 0])
         n_videos = int(n_videos[0, 0])
 
-        if isinstance(tfr, int):
+        if tfr.keys() == {'emd'}:
             emd = EMD()
+        elif tfr.keys() == {'eemd', 'sep_trends'}:
+            eemd = EEMD(trials=2, parallel=True, processes=n_jobs, separate_trends=tfr['sep_trends'])
+        elif tfr.keys() == {'ceemdan', 'beta_prog'}:
+            ceemdan = CEEMDAN(trials=2, parallel=True, processes=n_jobs, beta_progress=tfr['beta_prog'])
 
         X = []
         y = torch.tensor([], dtype=torch.long)
@@ -69,9 +73,9 @@ class DREAMERDataset(Dataset):
                     for j in range(n_videos):
                         stimuli_eeg_j = stimuli_eeg[j, 0]
                         baseline_eeg_j = baseline_eeg[j, 0]
-                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
@@ -84,12 +88,12 @@ class DREAMERDataset(Dataset):
                         if use_ecg:
                             stimuli_ecg_j = stimuli_ecg[j, 0].astype(np.float64)
                             baseline_ecg_j = baseline_ecg[j, 0].astype(np.float64)
-                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, method='iir',
+                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                     iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
-                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
+                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
+                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
                             baselines_ecg_j = baseline_ecg_j.reshape(-1, baseline_ecg_j.shape[0], samples)
                             avg_baseline_ecg_j = baselines_ecg_j.mean(axis=0)
                             if std:
@@ -99,21 +103,44 @@ class DREAMERDataset(Dataset):
                             if std:
                                 stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if isinstance(tfr, dict):
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
-                                                                       output=tfr['output'], verbose=False)
-                            X.append(torch.tensor(cwt, dtype=torch.float32))
-                        elif tfr is not None:
-                            imfs = []
-                            for i_emd in range(stimulis_j.shape[0]):
-                                imfs_ch = []
-                                for j_emd in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
-                                    if imf.shape[0] != tfr+1:
-                                        imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
-                                    imfs_ch.append(imf)
-                                imfs.append(imfs_ch)
-                            X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                        if tfr is not None:
+                            if tfr.keys() == {'freqs', 'output'}:
+                                cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
+                                                                        output=tfr['output'], n_jobs=n_jobs, verbose=False)
+                                X.append(torch.tensor(cwt, dtype=torch.float32))
+                            elif tfr.keys() == {'emd'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr['emd'])
+                                        if imf.shape[0] != tfr['emd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['emd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'eemd', 'sep_trends'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = eemd.eemd(stimulis_j[i_emd, j_emd], max_imf=tfr['eemd'])
+                                        if imf.shape[0] != tfr['eemd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['eemd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'ceemdan', 'beta_prog'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = ceemdan.ceemdan(stimulis_j[i_emd, j_emd], max_imf=tfr['ceemdan'])
+                                        if imf.shape[0] != tfr['ceemdan']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['ceemdan']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
@@ -123,9 +150,9 @@ class DREAMERDataset(Dataset):
                     for sess in sessions:
                         stimuli_eeg_j = stimuli_eeg[sess, 0]
                         baseline_eeg_j = baseline_eeg[sess, 0]
-                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
@@ -138,12 +165,12 @@ class DREAMERDataset(Dataset):
                         if use_ecg:
                             stimuli_ecg_j = stimuli_ecg[j, 0].astype(np.float64)
                             baseline_ecg_j = baseline_ecg[j, 0].astype(np.float64)
-                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, method='iir',
+                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                     iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
-                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
+                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
+                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
                             baselines_ecg_j = baseline_ecg_j.reshape(-1, baseline_ecg_j.shape[0], samples)
                             avg_baseline_ecg_j = baselines_ecg_j.mean(axis=0)
                             if std:
@@ -153,21 +180,44 @@ class DREAMERDataset(Dataset):
                             if std:
                                 stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if isinstance(tfr, dict):
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
-                                                                       output=tfr['output'], verbose=False)
-                            X.append(torch.tensor(cwt, dtype=torch.float32))
-                        elif tfr is not None:
-                            imfs = []
-                            for i_emd in range(stimulis_j.shape[0]):
-                                imfs_ch = []
-                                for j_emd in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
-                                    if imf.shape[0] != tfr+1:
-                                        imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
-                                    imfs_ch.append(imf)
-                                imfs.append(imfs_ch)
-                            X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                        if tfr is not None:
+                            if tfr.keys() == {'freqs', 'output'}:
+                                cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
+                                                                        output=tfr['output'], n_jobs=n_jobs, verbose=False)
+                                X.append(torch.tensor(cwt, dtype=torch.float32))
+                            elif tfr.keys() == {'emd'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr['emd'])
+                                        if imf.shape[0] != tfr['emd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['emd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'eemd', 'sep_trends'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = eemd.eemd(stimulis_j[i_emd, j_emd], max_imf=tfr['eemd'])
+                                        if imf.shape[0] != tfr['eemd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['eemd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'ceemdan', 'beta_prog'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = ceemdan.ceemdan(stimulis_j[i_emd, j_emd], max_imf=tfr['ceemdan'])
+                                        if imf.shape[0] != tfr['ceemdan']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['ceemdan']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
@@ -201,9 +251,9 @@ class DREAMERDataset(Dataset):
                     for j in range(n_videos):
                         stimuli_eeg_j = stimuli_eeg[j, 0]
                         baseline_eeg_j = baseline_eeg[j, 0]
-                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
@@ -216,12 +266,12 @@ class DREAMERDataset(Dataset):
                         if use_ecg:
                             stimuli_ecg_j = stimuli_ecg[j, 0].astype(np.float64)
                             baseline_ecg_j = baseline_ecg[j, 0].astype(np.float64)
-                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, method='iir',
+                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                     iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
-                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
+                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
+                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
                             baselines_ecg_j = baseline_ecg_j.reshape(-1, baseline_ecg_j.shape[0], samples)
                             avg_baseline_ecg_j = baselines_ecg_j.mean(axis=0)
                             if std:
@@ -231,21 +281,44 @@ class DREAMERDataset(Dataset):
                             if std:
                                 stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if isinstance(tfr, dict):
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
-                                                                       output=tfr['output'], verbose=False)
-                            X.append(torch.tensor(cwt, dtype=torch.float32))
-                        elif tfr is not None:
-                            imfs = []
-                            for i_emd in range(stimulis_j.shape[0]):
-                                imfs_ch = []
-                                for j_emd in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
-                                    if imf.shape[0] != tfr+1:
-                                        imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
-                                    imfs_ch.append(imf)
-                                imfs.append(imfs_ch)
-                            X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                        if tfr is not None:
+                            if tfr.keys() == {'freqs', 'output'}:
+                                cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
+                                                                        output=tfr['output'], n_jobs=n_jobs, verbose=False)
+                                X.append(torch.tensor(cwt, dtype=torch.float32))
+                            elif tfr.keys() == {'emd'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr['emd'])
+                                        if imf.shape[0] != tfr['emd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['emd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'eemd', 'sep_trends'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = eemd.eemd(stimulis_j[i_emd, j_emd], max_imf=tfr['eemd'])
+                                        if imf.shape[0] != tfr['eemd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['eemd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'ceemdan', 'beta_prog'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = ceemdan.ceemdan(stimulis_j[i_emd, j_emd], max_imf=tfr['ceemdan'])
+                                        if imf.shape[0] != tfr['ceemdan']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['ceemdan']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[j, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
@@ -255,9 +328,9 @@ class DREAMERDataset(Dataset):
                     for sess in sessions:
                         stimuli_eeg_j = stimuli_eeg[sess, 0]
                         baseline_eeg_j = baseline_eeg[sess, 0]
-                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        stimuli_eeg_j = mne.filter.filter_data(stimuli_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                        baseline_eeg_j = mne.filter.filter_data(baseline_eeg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
                         baselines_eeg_j = baseline_eeg_j.reshape(-1, baseline_eeg_j.shape[0], samples)
                         avg_baseline_eeg_j = baselines_eeg_j.mean(axis=0)
@@ -270,12 +343,12 @@ class DREAMERDataset(Dataset):
                         if use_ecg:
                             stimuli_ecg_j = stimuli_ecg[j, 0].astype(np.float64)
                             baseline_ecg_j = baseline_ecg[j, 0].astype(np.float64)
-                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, method='iir',
+                            stimuli_ecg_j = mne.filter.filter_data(stimuli_ecg_j.T, ecg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                 iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, method='iir',
+                            baseline_ecg_j = mne.filter.filter_data(baseline_ecg_j.T, eeg_sr, lowcut, highcut, n_jobs=n_jobs, method='iir',
                                                                     iir_params=dict(order=order, rp=0.1, rs=60, ftype=type), verbose=False)
-                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
-                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', verbose=False)
+                            stimuli_ecg_j = mne.filter.resample(stimuli_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
+                            baseline_ecg_j = mne.filter.resample(baseline_ecg_j, down=ecg_sr/eeg_sr, npad='auto', n_jobs=n_jobs, verbose=False)
                             baselines_ecg_j = baseline_ecg_j.reshape(-1, baseline_ecg_j.shape[0], samples)
                             avg_baseline_ecg_j = baselines_ecg_j.mean(axis=0)
                             if std:
@@ -285,21 +358,44 @@ class DREAMERDataset(Dataset):
                             if std:
                                 stimulis_ecg_j /= std_baseline_ecg_j
                             stimulis_j = np.concatenate((stimulis_j, stimulis_ecg_j), axis=1)
-                        if isinstance(tfr, dict):
-                            cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
-                                                                       output=tfr['output'], verbose=False)
-                            X.append(torch.tensor(cwt, dtype=torch.float32))
-                        elif tfr is not None:
-                            imfs = []
-                            for i_emd in range(stimulis_j.shape[0]):
-                                imfs_ch = []
-                                for j_emd in range(stimulis_j.shape[1]):
-                                    imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr)
-                                    if imf.shape[0] != tfr+1:
-                                        imf = np.concatenate((imf, np.zeros((tfr+1-imf.shape[0], imf.shape[1]))))
-                                    imfs_ch.append(imf)
-                                imfs.append(imfs_ch)
-                            X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                        if tfr is not None:
+                            if tfr.keys() == {'freqs', 'output'}:
+                                cwt = mne.time_frequency.tfr_array_morlet(stimulis_j, eeg_sr, tfr['freqs'], n_cycles=tfr['freqs']/2., zero_mean=True,
+                                                                        output=tfr['output'], n_jobs=n_jobs, verbose=False)
+                                X.append(torch.tensor(cwt, dtype=torch.float32))
+                            elif tfr.keys() == {'emd'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = emd.emd(stimulis_j[i_emd, j_emd], max_imf=tfr['emd'])
+                                        if imf.shape[0] != tfr['emd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['emd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'eemd', 'sep_trends'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = eemd.eemd(stimulis_j[i_emd, j_emd], max_imf=tfr['eemd'])
+                                        if imf.shape[0] != tfr['eemd']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['eemd']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
+                            elif tfr.keys() == {'ceemdan', 'beta_prog'}:
+                                imfs = []
+                                for i_emd in range(stimulis_j.shape[0]):
+                                    imfs_ch = []
+                                    for j_emd in range(stimulis_j.shape[1]):
+                                        imf = ceemdan.ceemdan(stimulis_j[i_emd, j_emd], max_imf=tfr['ceemdan'])
+                                        if imf.shape[0] != tfr['ceemdan']+1:
+                                            imf = np.concatenate((imf, np.zeros((tfr['ceemdan']+1-imf.shape[0], imf.shape[1]))))
+                                        imfs_ch.append(imf)
+                                    imfs.append(imfs_ch)
+                                X.append(torch.tensor(np.array(imfs), dtype=torch.float32))
                         else:
                             X.append(torch.tensor(stimulis_j, dtype=torch.float32).unsqueeze(1))
                         y = torch.cat((y, torch.tensor(labels[sess, 0], dtype=torch.long).repeat(stimulis_j.shape[0])))
