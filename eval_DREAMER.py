@@ -183,10 +183,7 @@ def eval_DREAMER(args):
                         losses_test.append(loss_test)
                         if epoch % 50 == 0:
                             print(f"Epoch {epoch}: Train loss: {loss}, Test accuracy: {acc}, Test loss: {loss_test}")
-                    if selected_model == 'TCNet':
-                        draw_loss(losses_train[500:], losses_test[500:], figs_path, selected_emotion, str(subject))
-                    else:
-                        draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
+                    draw_loss(losses_train, losses_test, figs_path, selected_emotion, str(subject))
 
                     with torch.no_grad():
                         for X_batch, Y_batch in valid_loader:

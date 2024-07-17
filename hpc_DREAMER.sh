@@ -3,7 +3,7 @@
 ### -- specify queue -- 
 #BSUB -q gpua100
 ### -- set the job Name -- 
-#BSUB -J DREAMER_aro
+#BSUB -J DREAMER_val
 ### -- ask for number of cores (default: 1) -- 
 #BSUB -n 6
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -33,4 +33,4 @@
 source /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/myenv/bin/activate
 
 
-python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py EEGNet arousal
+python3 -u /zhome/e8/0/214925/internship/Models_EEG_EmotionRecognition/eval_DREAMER.py TCNet valence
