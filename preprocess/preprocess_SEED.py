@@ -513,9 +513,9 @@ class SEEDDataset(Dataset):
                                 else:
                                     X.append(torch.tensor(stimuli_eeg_j, dtype=torch.float32).unsqueeze(1))
                                 y = torch.cat((y, torch.tensor(labels[video]+1, dtype=torch.long).repeat(stimuli_eeg_j.shape[0])))
-        X = torch.stack(X)
-        self.data = X.unsqueeze(1)
-        self.targets = torch.tensor(y, dtype=torch.long)
+        X = torch.cat(X, dim=0)
+        self.data = X
+        self.targets = y
         if save:
             self._save(path)
 

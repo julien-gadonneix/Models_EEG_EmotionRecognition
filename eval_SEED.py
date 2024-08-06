@@ -33,6 +33,7 @@ def eval_SEED(args):
     n_cpu = os.cpu_count()
     n_gpu = torch.cuda.device_count()
     accelerator = properties.name.split()[1]
+    accelerator = accelerator.split("-")[0]
 
     selected_model = args.model
     is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
@@ -46,24 +47,33 @@ def eval_SEED(args):
 
         best_start = 1
         best_sample = 200
-        best_std = True
+        best_stds = {'EEGNet': True, 'TCNet': False}
+        best_std = best_stds[selected_model]
         subjects = [[i] for i in range(15)]
         sessions = None
 
-        epochs_dep = 200
+        epochs_deps = {'EEGNet': 200, 'TCNet': 300}
+        epochs_dep  = epochs_deps[selected_model]
         epochs_ind = 20
         random_seed= 42
 
-        best_lr = 0.001
-        best_batch_size = 128
+        best_lrs = {'EEGNet': 0.001, 'TCNet': 0.000001}
+        best_lr = best_lrs[selected_model]
+        best_batch_sizes = {'EEGNet': 128, 'TCNet': 64}
+        best_batch_size = best_batch_sizes[selected_model]
+        worker_batch_size = best_batch_size // ray.train.get_context().get_world_size()
         best_F1 = 64
         best_D = 8
         best_F2 = 64
-        best_kernLength = 15 # perhaps go back to 100 for f_min = 2Hz
+        best_kernLengths = {'EEGNet': 15, 'TCNet': 5} # perhaps go back to 64 for f_min = 2Hz
+        best_kernLength = best_kernLengths[selected_model]
         best_dropout = .1
         best_norm_rate = .25
         best_nr = 1.
-        best_tfr = None
+        best_tfr = {'emd': 2} # {'freqs': np.arange(2, 50), 'output': 'power'}
+        best_innerChanss = {'EEGNet': 24, 'TCNet': 192}
+        best_innerChans = best_innerChanss[selected_model]
+        best_num_heads = 4
 
         names = ['Negative', 'Neutral', 'Positive']
         selected_emotion = 'happiness(SEED)'
@@ -72,7 +82,6 @@ def eval_SEED(args):
         nb_classes = len(names)
         chans = 62
         splits = KFold(n_splits=10, shuffle=True, random_state=random_seed)
-        best_innerChans = 24
         best_shifted = True
 
         cur_dir = Path(__file__).resolve().parent
@@ -105,14 +114,14 @@ def eval_SEED(args):
                 ###############################################################################
 
                 dataset = SEEDDataset(sets_path+info_str, subjects=subject, sessions=None, samples=best_sample, start=best_start, save=save,
-                                    tfr=best_tfr, std=best_std, n_jobs=n_cpu)
+                                    tfr=best_tfr, std=best_std, n_jobs=1)
                 dataset_size = len(dataset)
 
                 for i, (train_idx, val_idx) in enumerate(splits.split(list(range(dataset_size)))):
                     print("Fold no.{}:".format(i + 1))
                     train_sampler = SubsetRandomSampler(train_idx)
                     valid_sampler = SubsetRandomSampler(val_idx)
-                    train_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
+                    train_loader = DataLoader(dataset, batch_size=worker_batch_size, sampler=train_sampler, pin_memory=True)
                     train_loader = ray.train.torch.prepare_data_loader(train_loader)
                     valid_loader = DataLoader(dataset, batch_size=best_batch_size, sampler=valid_sampler, pin_memory=True)
                     print(len(train_idx), 'train samples')
@@ -126,9 +135,10 @@ def eval_SEED(args):
                     if selected_model == 'EEGNet':
                         model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
                                             kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(memory_format=torch.channels_last)
+                                            norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=list(best_tfr.values())[0]+1).to(memory_format=torch.channels_last)
                     elif selected_model == 'TCNet':
-                        model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr+1, shifted=best_shifted, kern_emd=best_kernLength)
+                        model = TCNet_EMD(nb_classes, chans, nb_freqs=list(best_tfr.values())[0]+1, shifted=best_shifted, kern_emd=best_kernLength,
+                                          innerChans=best_innerChans, num_heads=best_num_heads)
                     else:
                         raise ValueError('Invalid model selected')
                     model = ray.train.torch.prepare_model(model)
@@ -216,7 +226,7 @@ def eval_SEED(args):
                 # Creating data samplers and loaders:
                 train_sampler = SubsetRandomSampler(train_indices)
                 test_sampler = SubsetRandomSampler(test_indices)
-                train_loader = DataLoader(dataset_train, batch_size=best_batch_size, sampler=train_sampler, pin_memory=True)
+                train_loader = DataLoader(dataset_train, batch_size=worker_batch_size, sampler=train_sampler, pin_memory=True)
                 train_loader = ray.train.torch.prepare_data_loader(train_loader)
                 test_loader = DataLoader(dataset_test, batch_size=best_batch_size, sampler=test_sampler, pin_memory=True)
                 print(len(train_indices), 'train samples')
@@ -228,11 +238,12 @@ def eval_SEED(args):
                 ###############################################################################
 
                 if selected_model == 'EEGNet':
-                    model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample,
-                                      dropoutRate=best_dropout, kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
-                                      norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=best_tfr+1).to(memory_format=torch.channels_last)
+                    model = EEGNet_WT(nb_classes=nb_classes, Chans=chans, InnerChans=best_innerChans, Samples=best_sample, dropoutRate=best_dropout,
+                                        kernLength=best_kernLength, F1=best_F1, D=best_D, F2=best_F2,
+                                        norm_rate=best_norm_rate, nr=best_nr, dropoutType='Dropout', nb_freqs=list(best_tfr.values())[0]+1).to(memory_format=torch.channels_last)
                 elif selected_model == 'TCNet':
-                    model = TCNet_EMD(nb_classes, chans, nb_freqs=best_tfr+1, shifted=best_shifted, kern_emd=best_kernLength)
+                    model = TCNet_EMD(nb_classes, chans, nb_freqs=list(best_tfr.values())[0]+1, shifted=best_shifted, kern_emd=best_kernLength,
+                                        innerChans=best_innerChans, num_heads=best_num_heads)
                 else:
                     raise ValueError('Invalid model selected')
                 model = ray.train.torch.prepare_model(model)

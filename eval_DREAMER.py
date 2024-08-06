@@ -36,7 +36,7 @@ def eval_DREAMER(args):
     accelerator = accelerator.split("-")[0]
 
     selected_model = args.model
-    is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: understand why TCNet doesn't work with mixed precision (probably overflows)
+    is_ok = selected_model != 'TCNet' and device.type != 'mps' #TODO: overflows because of CWT
     selected_emotion = args.emotion
 
 
@@ -59,12 +59,12 @@ def eval_DREAMER(args):
         sessions = [[i] for i in range(18)]
         best_tfr = {'emd':2} # {'freqs': np.arange(2, 50), 'output': 'power'}
 
-        epochs_dep_mixs = {'EEGNet': 500, 'TCNet': 3000} # TCNet should be 30
+        epochs_dep_mixs = {'EEGNet': 500, 'TCNet': 300}
         epochs_dep_mix = epochs_dep_mixs[selected_model]
         epochs_dep_ind = 800
         epochs_ind = 20
 
-        best_lrs = {'EEGNet': 0.001, 'TCNet': 0.000001}  # TCNet should be 0.000001
+        best_lrs = {'EEGNet': 0.001, 'TCNet': 0.000001}
         best_lr = best_lrs[selected_model]
         best_batch_sizes = {'EEGNet': 128, 'TCNet': 64}
         best_batch_size = best_batch_sizes[selected_model]
@@ -131,7 +131,7 @@ def eval_DREAMER(args):
 
                 dataset = DREAMERDataset(sets_path+info_str, selected_emotion, subjects=subject, sessions=None, samples=best_sample, start=best_start,
                                         lowcut=best_lowcut, highcut=best_highcut, order=best_order, type=best_type, save=save, group_classes=best_group_classes,
-                                        tfr=best_tfr, use_ecg=best_use_ecg, std=best_std, n_jobs=n_cpu)
+                                        tfr=best_tfr, use_ecg=best_use_ecg, std=best_std, n_jobs=1)
                 dataset_size = len(dataset)
 
                 for i, (train_idx, val_idx) in enumerate(splits.split(list(range(dataset_size)))):
