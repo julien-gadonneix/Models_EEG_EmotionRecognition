@@ -51,7 +51,7 @@ class SEEDDataset(Dataset):
                         for j in range(n_videos):
                             key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                             stimuli_eeg_j = mat[key][:, 1:]
-                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                             avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                             if std:
                                 std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -105,7 +105,7 @@ class SEEDDataset(Dataset):
                         for video in videos:
                             key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                             stimuli_eeg_j = mat[key][:, 1:]
-                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                             avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                             if std:
                                 std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -172,7 +172,7 @@ class SEEDDataset(Dataset):
                         for j in range(n_videos):
                             key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                             stimuli_eeg_j = mat[key][:, 1:]
-                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                             avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                             if std:
                                 std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -226,7 +226,7 @@ class SEEDDataset(Dataset):
                         for video in videos:
                             key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                             stimuli_eeg_j = mat[key][:, 1:]
-                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                            stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                             avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                             if std:
                                 std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -289,7 +289,7 @@ class SEEDDataset(Dataset):
                             for j in range(n_videos):
                                 key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                                 stimuli_eeg_j = mat[key][:, 1:]
-                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                                 avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                                 if std:
                                     std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -343,7 +343,7 @@ class SEEDDataset(Dataset):
                             for video in videos:
                                 key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                                 stimuli_eeg_j = mat[key][:, 1:]
-                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                                 avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                                 if std:
                                     std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -411,7 +411,7 @@ class SEEDDataset(Dataset):
                             for j in range(n_videos):
                                 key = [k for k in mat if k.endswith(f'_eeg{j+1}')][0]
                                 stimuli_eeg_j = mat[key][:, 1:]
-                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                                 avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                                 if std:
                                     std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
@@ -465,7 +465,7 @@ class SEEDDataset(Dataset):
                             for video in videos:
                                 key = [k for k in mat if k.endswith(f'_eeg{video+1}')][0]
                                 stimuli_eeg_j = mat[key][:, 1:]
-                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)
+                                stimuli_eeg_j = stimuli_eeg_j.reshape(-1, stimuli_eeg_j.shape[0], samples)[start:]
                                 avg_stimuli_eeg_j = np.mean(stimuli_eeg_j, axis=0)
                                 if std:
                                     std_stimuli_eeg_j = np.std(stimuli_eeg_j, axis=0)
