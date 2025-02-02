@@ -16,7 +16,8 @@ Output_*
 # Ignore results
 tmp/
 sets/
-figs/losses/
+figs/
+tests/
 
 # Ignore virtualenv
 myenv/
