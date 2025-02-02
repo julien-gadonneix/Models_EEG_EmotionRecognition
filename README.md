@@ -1,6 +1,6 @@
 # Emotion Detection for Enhanced Psychiatric Diagnosis
 
-## Research internship in the Biosignall processing lab at DTU
+## Research internship in the Biosignall processing lab at DTU, Copenhagen
 
 ### Short description
 
