@@ -4,6 +4,8 @@
 
 ### Short description
 
+Most of the code is written in Python and uses the PyTorch library for Deep Learning.
+
 Emotional states play a crucial role in psychological health, influencing conditions like depression and presenting
 challenges due to their subjective nature. Recent advances in emotion detection systems offered promising glimpses for
 improving psychiatric assessments. Specifically, Brain-Computer Interface technologies provide a direct interface between brain
